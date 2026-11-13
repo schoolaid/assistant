@@ -76,6 +76,8 @@ Then, in the app:
 - **Policy**: register the app's policy for the five workspace models; a conversation and what
   hangs from it belong to their author.
 - **Queue**: a connection and a queue both named `assistant`, with their own worker.
+- **Schedule**: `assistant:resume-stale-turns` every minute (it picks up a step whose worker
+  died) and `assistant:prune` daily.
 - **Config**: fill in what is the app's own in the published file: `core_tools`, `tool_groups`,
   `panel_only`, `undo`, `entities`, `suggestions`. The published translations carry MarketAid's
   texts for those sections; replace them.

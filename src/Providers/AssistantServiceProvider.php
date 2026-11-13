@@ -3,6 +3,11 @@
 namespace SchoolAid\Assistant\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use SchoolAid\Assistant\Console\AssistantFeedbackCommand;
+use SchoolAid\Assistant\Console\EvaluateKnowledgeCommand;
+use SchoolAid\Assistant\Console\IndexKnowledgeCommand;
+use SchoolAid\Assistant\Console\PruneAssistantDataCommand;
+use SchoolAid\Assistant\Console\ResumeStaleTurnsCommand;
 use SchoolAid\Assistant\Http\AssistantRoutes;
 use SchoolAid\Assistant\Knowledge\KnowledgeSearch;
 use SchoolAid\Assistant\Knowledge\MeilisearchKnowledgeIndex;
@@ -15,6 +20,9 @@ use SchoolAid\Assistant\Support\AssistantNaming;
  * Binds what the engine provides by itself. Everything under `SchoolAid\Assistant\Contracts` is the
  * app's to bind, in its own provider: the engine does not run until every contract has an
  * implementation.
+ *
+ * It also registers the engine's console commands (`assistant:resume-stale-turns`,
+ * `assistant:prune`…); the app schedules them.
  *
  * The app may give the assistant another name with AssistantNaming::use() in the `register()` of
  * its provider. That runs after this provider registers, so the config defaults are merged when
@@ -57,6 +65,14 @@ class AssistantServiceProvider extends ServiceProvider
         if (! $this->app->runningInConsole()) {
             return;
         }
+
+        $this->commands([
+            AssistantFeedbackCommand::class,
+            EvaluateKnowledgeCommand::class,
+            IndexKnowledgeCommand::class,
+            PruneAssistantDataCommand::class,
+            ResumeStaleTurnsCommand::class,
+        ]);
 
         $this->publishes([self::CONFIG => config_path(AssistantNaming::name().'.php')], 'assistant-config');
         $this->publishesMigrations([self::MIGRATIONS => database_path('migrations')], 'assistant-migrations');

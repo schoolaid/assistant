@@ -52,3 +52,9 @@ it('reads the Anthropic connection from its own config', function () {
         ->and(AnthropicSettings::url())->toBe('https://api.anthropic.com/v1')
         ->and(AnthropicSettings::version())->toBe('2023-06-01');
 });
+
+it('registers the engine commands for the app to schedule', function () {
+    $commands = array_keys(Illuminate\Support\Facades\Artisan::all());
+
+    expect($commands)->toContain('assistant:resume-stale-turns', 'assistant:prune', 'assistant:feedback', 'assistant:knowledge:index');
+});
