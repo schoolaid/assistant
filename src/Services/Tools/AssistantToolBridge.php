@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Services\Tools;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use SchoolAid\Assistant\Contracts\PanelScope;
 use SchoolAid\Assistant\Contracts\ToolCallLog;
 use SchoolAid\Assistant\Contracts\ToolSource;
@@ -66,7 +67,7 @@ class AssistantToolBridge implements ToolBridge
 
     public function definitions(): array
     {
-        $deferOutsideCore = (bool) config('assistant.tool_search.enabled', true);
+        $deferOutsideCore = (bool) AssistantNaming::config('tool_search.enabled', true);
         $definitions = [];
 
         foreach ([...$this->catalog->tools(), ...$this->catalog->extraTools()] as $tool) {

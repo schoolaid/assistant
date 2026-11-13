@@ -2,12 +2,13 @@
 
 namespace SchoolAid\Assistant\Services;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use Illuminate\Contracts\Auth\Authenticatable;
 use SchoolAid\Assistant\Contracts\PanelScope;
 use SchoolAid\Assistant\Services\Tools\AssistantToolBridge;
 
 /**
- * Las frases de arranque del chat: de `config('assistant.suggestions')`, en orden, las que el usuario puede
+ * Las frases de arranque del chat: de `AssistantNaming::config('suggestions')`, en orden, las que el usuario puede
  * cumplir con las tools que el puente le carga hoy (permisos, paquetes y sucursal ya aplicados por
  * {@see AssistantToolBridge::definitions()}), hasta `assistant.suggestions_limit`.
  */
@@ -30,14 +31,14 @@ class AssistantSuggestions
         );
         $suggestions = [];
 
-        foreach ((array) config('assistant.suggestions', []) as $suggestion) {
+        foreach ((array) AssistantNaming::config('suggestions', []) as $suggestion) {
             if (array_diff($suggestion['tools'], $available) !== []) {
                 continue;
             }
 
-            $suggestions[] = ['id' => $suggestion['id'], 'text' => __("assistant.suggestions.{$suggestion['id']}")];
+            $suggestions[] = ['id' => $suggestion['id'], 'text' => AssistantNaming::trans("suggestions.{$suggestion['id']}")];
 
-            if (count($suggestions) >= (int) config('assistant.suggestions_limit', 4)) {
+            if (count($suggestions) >= (int) AssistantNaming::config('suggestions_limit', 4)) {
                 break;
             }
         }

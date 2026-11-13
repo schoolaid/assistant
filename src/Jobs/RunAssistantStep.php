@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Jobs;
 
+use SchoolAid\Assistant\Jobs\Concerns\RemembersWorkspace;
 use SchoolAid\Assistant\Enums\StepOutcomeEnum;
 use SchoolAid\Assistant\Models\AssistantTurn;
 use SchoolAid\Assistant\Services\Agent\AssistantTurnRunner;
@@ -23,7 +24,7 @@ use Illuminate\Queue\SerializesModels;
  */
 class RunAssistantStep implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, RemembersWorkspace, SerializesModels;
 
     public const CONNECTION = 'assistant';
 
@@ -37,6 +38,7 @@ class RunAssistantStep implements ShouldQueue
     {
         $this->onConnection(self::CONNECTION);
         $this->onQueue(self::QUEUE);
+        $this->rememberWorkspace();
     }
 
     public function handle(AssistantTurnRunner $runner): void

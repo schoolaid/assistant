@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Console;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use SchoolAid\Assistant\Knowledge\KnowledgeEvaluator;
 use SchoolAid\Assistant\Knowledge\KnowledgeSearch;
 use Illuminate\Console\Command;
@@ -32,7 +33,7 @@ class EvaluateKnowledgeCommand extends Command
         $ratios = $this->option('ratio') ?: ['0', '0.3', '0.5', '0.8'];
         $abstainBelow = $this->option('abstain-below') !== null && $this->option('abstain-below') !== ''
             ? (float) $this->option('abstain-below')
-            : (float) config('assistant.knowledge.abstain_below');
+            : (float) AssistantNaming::config('knowledge.abstain_below');
         $split = (string) $this->option('split');
         $splits = array_values(array_unique(array_column($data['items'], 'split')));
 

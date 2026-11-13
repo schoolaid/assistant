@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Http\Requests;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use SchoolAid\Assistant\Models\AssistantMessage;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -36,10 +37,10 @@ class StoreAssistantFeedbackRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'helpful.required' => __('assistant.validation.helpful_required'),
-            'helpful.boolean' => __('assistant.validation.helpful_boolean'),
-            'comment.string' => __('assistant.validation.comment_string'),
-            'comment.max' => __('assistant.validation.comment_max'),
+            'helpful.required' => AssistantNaming::trans('validation.helpful_required'),
+            'helpful.boolean' => AssistantNaming::trans('validation.helpful_boolean'),
+            'comment.string' => AssistantNaming::trans('validation.comment_string'),
+            'comment.max' => AssistantNaming::trans('validation.comment_max'),
         ];
     }
 
@@ -53,7 +54,7 @@ class StoreAssistantFeedbackRequest extends FormRequest
                 $message = $this->route('message');
 
                 if ($message instanceof AssistantMessage && $message->role !== 'assistant') {
-                    $validator->errors()->add('helpful', __('assistant.validation.feedback_not_an_answer'));
+                    $validator->errors()->add('helpful', AssistantNaming::trans('validation.feedback_not_an_answer'));
                 }
             },
         ];

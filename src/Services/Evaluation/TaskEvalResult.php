@@ -7,7 +7,7 @@ namespace SchoolAid\Assistant\Services\Evaluation;
  *
  * @phpstan-type Tokens array{input: int, output: int, cache_read: int, cache_write: int}
  * @phpstan-type Knowledge array{calls: int, withModule: int, correctModule: int|null}
- * @phpstan-type Guide array{answerable: bool, labels: list<array{page: string, section?: string}>, opened: list<string>, openedLabeled: bool, read: list<string>, verdict: array{verdict: string, invented: bool, comment: string}|null}
+ * @phpstan-type Guide array{answerable: bool, labels: list<array{page: string, section?: string}>, opened: list<string>, openedLabeled: bool, screens?: list<string>, linkedScreen?: bool|null, read: list<string>, verdict: array{verdict: string, invented: bool, comment: string}|null}
  */
 final readonly class TaskEvalResult
 {

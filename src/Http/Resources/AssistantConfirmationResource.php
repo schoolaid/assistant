@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Http\Resources;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use SchoolAid\Assistant\Contracts\PreviewDetails;
 use SchoolAid\Assistant\Contracts\EntityLabels;
 use SchoolAid\Assistant\Enums\AssistantConfirmationStatusEnum;
@@ -119,7 +120,7 @@ class AssistantConfirmationResource extends JsonResource
     {
         $mayHaveUndo = $this->status === AssistantConfirmationStatusEnum::Confirmed
             && $this->undoes_confirmation_id === null
-            && array_key_exists($this->tool, (array) config('assistant.undo'));
+            && array_key_exists($this->tool, (array) AssistantNaming::config('undo'));
 
         if (! $mayHaveUndo) {
             return null;

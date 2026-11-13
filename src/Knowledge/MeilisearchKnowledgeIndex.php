@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Knowledge;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
@@ -55,7 +56,7 @@ class MeilisearchKnowledgeIndex implements KnowledgeSearch
             throw new RuntimeException("Meilisearch: HTTP {$index->status()} al leer el índice {$this->uid()}");
         }
 
-        $name = config('assistant.knowledge.embedder.name');
+        $name = AssistantNaming::config('knowledge.embedder.name');
         $embedder = $this->embedderSettings();
         $stored = $this->client()->get("/indexes/{$this->uid()}/settings/embedders")->throw()->json($name);
 
@@ -200,7 +201,7 @@ class MeilisearchKnowledgeIndex implements KnowledgeSearch
             $filter = 'module = "'.addcslashes($module, '\\"').'" AND '.$filter;
         }
 
-        return $this->hits($query, $filter, $limit, ['id', 'source', 'module', 'page', 'heading', 'anchor', 'text'], $semanticRatio ?? (float) config('assistant.knowledge.semantic_ratio'))
+        return $this->hits($query, $filter, $limit, ['id', 'source', 'module', 'page', 'heading', 'anchor', 'text'], $semanticRatio ?? (float) AssistantNaming::config('knowledge.semantic_ratio'))
             ->map(fn (array $hit): array => [
                 'id' => (string) $hit['id'],
                 'source' => (string) $hit['source'],
@@ -220,7 +221,7 @@ class MeilisearchKnowledgeIndex implements KnowledgeSearch
      */
     public function searchVideos(string $query, int $limit = 5): array
     {
-        return $this->hits($query, 'source = "video"', $limit, ['guide', 'module', 'heading', 'menu', 'steps', 'duration'], (float) config('assistant.knowledge.videos.semantic_ratio'))
+        return $this->hits($query, 'source = "video"', $limit, ['guide', 'module', 'heading', 'menu', 'steps', 'duration'], (float) AssistantNaming::config('knowledge.videos.semantic_ratio'))
             ->filter(fn (array $hit): bool => is_string($hit['guide'] ?? null) && $hit['guide'] !== '')
             ->map(fn (array $hit): array => [
                 'guide' => $hit['guide'],
@@ -257,13 +258,13 @@ class MeilisearchKnowledgeIndex implements KnowledgeSearch
     private function hits(string $query, string $filter, int $limit, array $attributes, float $semanticRatio): Collection
     {
         $payload = [
-            'q' => config('assistant.knowledge.embedder.query_prefix', '').$query,
+            'q' => AssistantNaming::config('knowledge.embedder.query_prefix', '').$query,
             'limit' => $limit,
             'hybrid' => [
-                'embedder' => config('assistant.knowledge.embedder.name'),
+                'embedder' => AssistantNaming::config('knowledge.embedder.name'),
                 'semanticRatio' => $semanticRatio,
             ],
-            'matchingStrategy' => config('assistant.knowledge.matching_strategy'),
+            'matchingStrategy' => AssistantNaming::config('knowledge.matching_strategy'),
             'showRankingScore' => true,
             'attributesToRetrieve' => $attributes,
             'locales' => ['spa'],
@@ -306,7 +307,7 @@ class MeilisearchKnowledgeIndex implements KnowledgeSearch
 
     private function waitTask(int $task): void
     {
-        $deadline = microtime(true) + (int) config('assistant.knowledge.task_timeout');
+        $deadline = microtime(true) + (int) AssistantNaming::config('knowledge.task_timeout');
 
         do {
             $response = $this->client()->get("/tasks/{$task}");
@@ -342,15 +343,15 @@ class MeilisearchKnowledgeIndex implements KnowledgeSearch
     {
         return [
             'source' => 'huggingFace',
-            'model' => (string) config('assistant.knowledge.embedder.model'),
-            'documentTemplate' => config('assistant.knowledge.embedder.document_prefix', '')."{{doc.moduleTitle}} · {{doc.pageTitle}} · {{doc.heading}}\n{{doc.text|truncatewords: 250}}",
+            'model' => (string) AssistantNaming::config('knowledge.embedder.model'),
+            'documentTemplate' => AssistantNaming::config('knowledge.embedder.document_prefix', '')."{{doc.moduleTitle}} · {{doc.pageTitle}} · {{doc.heading}}\n{{doc.text|truncatewords: 250}}",
             'documentTemplateMaxBytes' => self::TEMPLATE_MAX_BYTES,
         ];
     }
 
     private function uid(): string
     {
-        return config('assistant.knowledge.index');
+        return AssistantNaming::config('knowledge.index');
     }
 
     private function client(): PendingRequest

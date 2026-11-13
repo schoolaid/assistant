@@ -34,6 +34,16 @@ const SHARED_SOURCES = [
     'database/factories/Assistant*Factory.php' => ['database/factories', 'Database\\Factories', 'SchoolAid\\Assistant\\Database\\Factories'],
 ];
 
+/**
+ * Files copied as they are: MarketAid path (a glob) => directory in the package. The translations
+ * also carry MarketAid's own texts (its tools, its suggestions); an app publishes them and replaces
+ * those sections with its own.
+ */
+const COPIED_AS_IS = [
+    'resources/lang/es/assistant.php' => 'resources/lang/es',
+    'resources/lang/en/assistant.php' => 'resources/lang/en',
+];
+
 $arguments = array_values(array_filter(array_slice($argv, 1), fn (string $argument): bool => ! str_starts_with($argument, '--')));
 $checkOnly = in_array('--check', $argv, true);
 $marketaid = rtrim($arguments[0] ?? '', '/');
@@ -96,6 +106,20 @@ if (! $checkOnly) {
         }
 
         file_put_contents($path, rewrite($contents, $shared['classes']));
+    }
+}
+
+if (! $checkOnly) {
+    foreach (COPIED_AS_IS as $pattern => $directory) {
+        foreach (glob($marketaid.'/'.$pattern) ?: [] as $path) {
+            $destination = dirname(__DIR__).'/'.$directory;
+
+            if (! is_dir($destination)) {
+                mkdir($destination, 0755, true);
+            }
+
+            copy($path, $destination.'/'.basename($path));
+        }
     }
 }
 

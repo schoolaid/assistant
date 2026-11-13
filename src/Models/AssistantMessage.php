@@ -2,6 +2,8 @@
 
 namespace SchoolAid\Assistant\Models;
 
+use SchoolAid\Assistant\Models\Concerns\HasAssistantTable;
+use SchoolAid\Assistant\Models\Concerns\InWorkspace;
 use SchoolAid\Assistant\Enums\AssistantMessageKindEnum;
 use SchoolAid\Assistant\Database\Factories\AssistantMessageFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -30,7 +32,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  */
 class AssistantMessage extends Model
 {
-    use HasFactory;
+    use HasFactory, HasAssistantTable, InWorkspace;
+
+    public const TABLE = 'messages';
 
     protected $fillable = [
         'conversation_id', 'turn_id', 'role', 'kind', 'content', 'display_text', 'choices', 'payload', 'model', 'stop_reason',

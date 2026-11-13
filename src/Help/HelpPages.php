@@ -17,6 +17,10 @@ use Symfony\Component\Yaml\Yaml;
  *
  * Una página se identifica por su ruta relativa a `docs/modules/` (`orders/admin/conceptos.md`).
  * Viaja en la imagen: `.dockerignore` deja pasar `docs/modules`.
+ *
+ * `menu` del frontmatter son las claves del menú del panel de las pantallas de las que habla la página (las mismas
+ * de las guías en video): una página sin `menu` usa la del `admin/index.md` de su módulo, y `menu: []` la deja sin
+ * pantalla. {@see PanelScreens} las vuelve enlaces, solo las que la persona ve.
  */
 class HelpPages
 {
@@ -33,7 +37,7 @@ class HelpPages
     private const FRONTMATTER = '/\A---\R(.*?)\R---\R/su';
 
     /**
-     * @var Collection<string, array{page: string, module: string, title: string, order: int, status: string, updated: string}>|null
+     * @var Collection<string, array{page: string, module: string, title: string, order: int, status: string, updated: string, menu: list<string>}>|null
      */
     private ?Collection $catalog = null;
 
@@ -70,7 +74,7 @@ class HelpPages
     }
 
     /**
-     * @return Collection<int, array{page: string, module: string, title: string, order: int, status: string, updated: string}>
+     * @return Collection<int, array{page: string, module: string, title: string, order: int, status: string, updated: string, menu: list<string>}>
      */
     public function pages(string $module): Collection
     {
@@ -81,11 +85,21 @@ class HelpPages
     }
 
     /**
-     * @return array{page: string, module: string, title: string, order: int, status: string, updated: string}|null
+     * @return array{page: string, module: string, title: string, order: int, status: string, updated: string, menu: list<string>}|null
      */
     public function find(string $page): ?array
     {
         return $this->catalog()->get($page);
+    }
+
+    /**
+     * Las claves del menú del panel de las pantallas de la página (ver la clase); vacío si no es del catálogo.
+     *
+     * @return list<string>
+     */
+    public function menu(string $page): array
+    {
+        return $this->find($page)['menu'] ?? [];
     }
 
     /**
@@ -135,11 +149,15 @@ class HelpPages
     }
 
     /**
-     * @return Collection<string, array{page: string, module: string, title: string, order: int, status: string, updated: string}>
+     * @return Collection<string, array{page: string, module: string, title: string, order: int, status: string, updated: string, menu: list<string>}>
      */
     private function catalog(): Collection
     {
-        return $this->catalog ??= collect(glob(base_path($this->root.'/*/admin/*.md')) ?: [])
+        if ($this->catalog !== null) {
+            return $this->catalog;
+        }
+
+        $catalog = collect(glob(base_path($this->root.'/*/admin/*.md')) ?: [])
             ->map(function (string $path): ?array {
                 $page = Str::after($path, base_path($this->root).'/');
 
@@ -160,10 +178,38 @@ class HelpPages
                     'order' => (int) ($meta['order'] ?? 0),
                     'status' => (string) ($meta['status'] ?? 'stable'),
                     'updated' => (string) ($meta['updated'] ?? ''),
+                    'menu' => self::menuKeys($meta['menu'] ?? null),
+                    'ownMenu' => array_key_exists('menu', $meta),
                 ];
             })
             ->filter()
             ->keyBy('page');
+
+        return $this->catalog = $catalog->map(function (array $entry) use ($catalog): array {
+            $index = $catalog->get("{$entry['module']}/admin/index.md");
+
+            if (! $entry['ownMenu'] && $index !== null) {
+                $entry['menu'] = $index['menu'];
+            }
+
+            unset($entry['ownMenu']);
+
+            return $entry;
+        });
+    }
+
+    /**
+     * `menu` del frontmatter como lista de claves; cualquier otra forma cuenta como sin pantallas.
+     *
+     * @return list<string>
+     */
+    private static function menuKeys(mixed $menu): array
+    {
+        if (! is_array($menu)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter($menu, fn (mixed $key): bool => is_string($key) && $key !== '')));
     }
 
     /**

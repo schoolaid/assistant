@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Services;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -12,7 +13,7 @@ class AssistantSchemaCheck
 {
     public function tenantHasTables(): bool
     {
-        return Schema::hasTable('assistant_conversations')
-            && Schema::hasColumn('assistant_confirmations', 'undoes_confirmation_id');
+        return Schema::hasTable(AssistantNaming::table('conversations'))
+            && Schema::hasColumn(AssistantNaming::table('confirmations'), 'undoes_confirmation_id');
     }
 }

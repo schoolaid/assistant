@@ -116,7 +116,7 @@ class ConversationLimit
 
         $promptTokens = $last->input_tokens + $last->cache_read_tokens + $last->cache_write_tokens;
 
-        return $promptTokens >= (int) config('assistant.max_conversation_input_tokens');
+        return $promptTokens >= (int) AssistantNaming::config('max_conversation_input_tokens');
     }
 
     private function wasRejectedByApi(?AssistantTurn $last): bool

@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Models;
 
+use SchoolAid\Assistant\Models\Concerns\HasAssistantTable;
 use SchoolAid\Assistant\Models\Concerns\OnSharedConnection;
 use Illuminate\Database\Eloquent\Model;
 
@@ -18,9 +19,9 @@ use Illuminate\Database\Eloquent\Model;
  */
 class AssistantUserUsage extends Model
 {
-    use OnSharedConnection;
+    use OnSharedConnection, HasAssistantTable;
 
-    protected $table = 'assistant_user_usage';
+    public const TABLE = 'user_usage';
 
     protected $fillable = ['tenant_id', 'user_id', 'period', 'responses', 'cost_usd'];
 

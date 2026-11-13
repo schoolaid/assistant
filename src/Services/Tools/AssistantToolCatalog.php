@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Services\Tools;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use SchoolAid\Assistant\Contracts\ToolSource;
 use Laravel\Mcp\Server\Tool;
 
@@ -105,7 +106,7 @@ class AssistantToolCatalog
             return self::READ_GROUP;
         }
 
-        $group = $this->classified($tool->name(), (array) config('assistant.tool_groups', []));
+        $group = $this->classified($tool->name(), (array) AssistantNaming::config('tool_groups', []));
 
         if ($group === null || $this->source->actionClasses($tool) === null) {
             return $group;
@@ -123,10 +124,10 @@ class AssistantToolCatalog
      */
     public function isDenied(string $name): bool
     {
-        $denied = (array) config('assistant.denied_tools', []);
+        $denied = (array) AssistantNaming::config('denied_tools', []);
 
-        if ((bool) config('assistant.knowledge.enabled')) {
-            $denied = [...$denied, ...(array) config('assistant.denied_with_knowledge', [])];
+        if ((bool) AssistantNaming::config('knowledge.enabled')) {
+            $denied = [...$denied, ...(array) AssistantNaming::config('denied_with_knowledge', [])];
         }
 
         return in_array($name, $denied, true);
@@ -137,7 +138,7 @@ class AssistantToolCatalog
      */
     public function isCore(string $name): bool
     {
-        return in_array($name, (array) config('assistant.core_tools', []), true);
+        return in_array($name, (array) AssistantNaming::config('core_tools', []), true);
     }
 
     /**
@@ -150,7 +151,7 @@ class AssistantToolCatalog
             return true;
         }
 
-        if ($this->classified($tool->name(), (array) config('assistant.tool_groups', [])) === null) {
+        if ($this->classified($tool->name(), (array) AssistantNaming::config('tool_groups', [])) === null) {
             return false;
         }
 
@@ -171,7 +172,7 @@ class AssistantToolCatalog
 
     private function actionGroup(string $actionClass): ?int
     {
-        return $this->classified($actionClass, (array) config('assistant.subscription_action_groups', []));
+        return $this->classified($actionClass, (array) AssistantNaming::config('subscription_action_groups', []));
     }
 
     /**
@@ -181,7 +182,7 @@ class AssistantToolCatalog
      */
     private function classified(string $key, array $groups): ?int
     {
-        if (in_array($key, (array) config('assistant.panel_only', []), true)) {
+        if (in_array($key, (array) AssistantNaming::config('panel_only', []), true)) {
             return null;
         }
 

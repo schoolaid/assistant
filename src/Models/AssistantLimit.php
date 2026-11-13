@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Models;
 
+use SchoolAid\Assistant\Models\Concerns\HasAssistantTable;
 use SchoolAid\Assistant\Models\Concerns\OnSharedConnection;
 use Illuminate\Database\Eloquent\Model;
 
@@ -20,9 +21,9 @@ use Illuminate\Database\Eloquent\Model;
  */
 class AssistantLimit extends Model
 {
-    use OnSharedConnection;
+    use OnSharedConnection, HasAssistantTable;
 
-    protected $table = 'assistant_limits';
+    public const TABLE = 'limits';
 
     protected $fillable = ['tenant_id', 'limit_key', 'value', 'max', 'locked', 'locked_value'];
 

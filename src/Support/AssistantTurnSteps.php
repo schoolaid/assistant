@@ -4,6 +4,7 @@ namespace SchoolAid\Assistant\Support;
 
 use SchoolAid\Assistant\Enums\AssistantMessageKindEnum;
 use SchoolAid\Assistant\Models\AssistantTurn;
+use SchoolAid\Assistant\Services\Agent\ExportDocumentTool;
 use SchoolAid\Assistant\Services\Agent\ExportFileTool;
 use SchoolAid\Assistant\Services\Agent\OfferChoicesTool;
 use SchoolAid\Assistant\Services\Agent\ShowChartTool;
@@ -33,7 +34,7 @@ final class AssistantTurnSteps
      *
      * @var list<string>
      */
-    public const HIDDEN_TOOLS = ['report-unanswered-question', OfferChoicesTool::NAME, ShowChartTool::NAME, ExportFileTool::NAME];
+    public const HIDDEN_TOOLS = ['report-unanswered-question', OfferChoicesTool::NAME, ShowChartTool::NAME, ExportFileTool::NAME, ExportDocumentTool::NAME];
 
     /**
      * @return list<array{tool: string, label: string, status: string}>
@@ -89,8 +90,8 @@ final class AssistantTurnSteps
 
     private function label(string $tool): string
     {
-        $key = "assistant.steps.{$tool}";
+        $key = AssistantNaming::langKey("steps.{$tool}");
 
-        return Lang::has($key) ? (string) __($key) : (string) __('assistant.step_fallback', ['tool' => $tool]);
+        return Lang::has($key) ? (string) __($key) : (string) AssistantNaming::trans('step_fallback', ['tool' => $tool]);
     }
 }

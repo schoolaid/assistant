@@ -2,6 +2,8 @@
 
 namespace SchoolAid\Assistant\Services\Settings;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
+use SchoolAid\Assistant\Services\Anthropic\AnthropicSettings;
 use SchoolAid\Assistant\Enums\AssistantApiKeyStatusEnum;
 use SchoolAid\Assistant\Models\AssistantApiKey;
 use Illuminate\Http\Client\ConnectionException;
@@ -90,19 +92,19 @@ class AssistantApiKeys
     private function verify(string $apiKey): ?string
     {
         if ($apiKey === '') {
-            return __('assistant.settings.api_key_empty');
+            return AssistantNaming::trans('settings.api_key_empty');
         }
 
         try {
             $response = Http::withHeaders([
                 'x-api-key' => $apiKey,
-                'anthropic-version' => (string) config('prism.providers.anthropic.version'),
+                'anthropic-version' => AnthropicSettings::version(),
             ])
                 ->timeout(self::VERIFY_TIMEOUT_SECONDS)
                 ->acceptJson()
-                ->get(rtrim((string) config('prism.providers.anthropic.url'), '/').'/models', ['limit' => 1]);
+                ->get(AnthropicSettings::url().'/models', ['limit' => 1]);
         } catch (ConnectionException) {
-            return __('assistant.settings.api_key_unreachable');
+            return AssistantNaming::trans('settings.api_key_unreachable');
         }
 
         if ($response->successful()) {
@@ -110,7 +112,7 @@ class AssistantApiKeys
         }
 
         return in_array($response->status(), [401, 403], true)
-            ? __('assistant.settings.api_key_rejected')
-            : __('assistant.settings.api_key_unverified', ['status' => $response->status()]);
+            ? AssistantNaming::trans('settings.api_key_rejected')
+            : AssistantNaming::trans('settings.api_key_unverified', ['status' => $response->status()]);
     }
 }

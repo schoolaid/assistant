@@ -2,9 +2,11 @@
 
 namespace SchoolAid\Assistant\Services\Entities;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
+
 /**
  * Un registro que el agente leyó o que una escritura confirmada tocó o creó, antes de cargarlo: su tipo
- * (`config('assistant.entities')`), su id y, en un cliente, su tipo de cliente (`modelKey` de get-customer-detail).
+ * (`AssistantNaming::config('entities')`), su id y, en un cliente, su tipo de cliente (`modelKey` de get-customer-detail).
  * `date` solo en un horario: la clase que se consultó. `created`: lo creó la escritura (la ruta era `result.*`).
  */
 final readonly class AssistantEntityRef

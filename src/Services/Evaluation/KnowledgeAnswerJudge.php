@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Services\Evaluation;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use SchoolAid\Assistant\Help\HelpPages;
 use SchoolAid\Assistant\Services\Anthropic\AnthropicMessagesClient;
 use SchoolAid\Assistant\Services\Usage\AssistantBudget;
@@ -76,7 +77,7 @@ TEXT;
     public function judge(string $question, array $labels, array $read, string $answer): array
     {
         $response = $this->client->create([
-            'model' => (string) config('assistant.model'),
+            'model' => (string) AssistantNaming::config('model'),
             'max_tokens' => self::MAX_TOKENS,
             'output_config' => ['effort' => 'low', 'format' => ['type' => 'json_schema', 'schema' => $this->schema()]],
             'system' => self::SYSTEM,

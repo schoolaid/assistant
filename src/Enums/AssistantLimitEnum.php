@@ -2,6 +2,8 @@
 
 namespace SchoolAid\Assistant\Enums;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
+
 /**
  * Límites del asistente que se configuran por market y desde central
  * ({@see \SchoolAid\Assistant\Services\Settings\AssistantSettings}).
@@ -41,8 +43,8 @@ enum AssistantLimitEnum: string
     {
         return match ($this) {
             self::MonthlyBudgetUsd, self::UserMonthlyBudgetUsd => null,
-            self::MessagesPerMinute => (float) config('assistant.limits.messages_per_minute', 20),
-            self::WarningPercent => (float) config('assistant.limits.warning_percent', 80),
+            self::MessagesPerMinute => (float) AssistantNaming::config('limits.messages_per_minute', 20),
+            self::WarningPercent => (float) AssistantNaming::config('limits.warning_percent', 80),
         };
     }
 

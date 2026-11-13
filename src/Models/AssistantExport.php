@@ -2,6 +2,8 @@
 
 namespace SchoolAid\Assistant\Models;
 
+use SchoolAid\Assistant\Models\Concerns\HasAssistantTable;
+use SchoolAid\Assistant\Models\Concerns\InWorkspace;
 use SchoolAid\Assistant\Enums\AssistantExportStatusEnum;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -27,7 +29,9 @@ use Illuminate\Support\Str;
  */
 class AssistantExport extends Model
 {
-    use HasUuids;
+    use HasUuids, HasAssistantTable, InWorkspace;
+
+    public const TABLE = 'exports';
 
     protected $fillable = [
         'id', 'conversation_id', 'turn_id', 'user_id', 'format', 'title', 'source', 'columns', 'rows', 'status',

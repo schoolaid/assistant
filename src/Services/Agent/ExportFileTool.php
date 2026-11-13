@@ -15,9 +15,14 @@ final class ExportFileTool
 {
     public const NAME = 'export-file';
 
-    public const DESCRIPTION = 'Genera un archivo para descargar con los datos de una lectura (list-orders, list-accounts-receivable, run-report, list-subscriptions…): pásale la misma tool y los mismos argumentos que usaste (o usarías) para leerlos, sin page ni perPage: el archivo trae todas las páginas. No escribas tú las filas. Pon en columns los campos que importan, con su nombre en el idioma de la persona. El archivo aparece en el chat con su botón para descargar; dile en una frase qué contiene.';
+    public const DESCRIPTION = 'Genera un archivo para descargar con los datos de una lectura (list-orders, list-accounts-receivable, run-report, list-subscriptions…): pásale la misma tool y los mismos argumentos que usaste (o usarías) para leerlos, sin page ni perPage: el archivo trae todas las páginas. No escribas tú las filas. Pon en columns los campos que importan, con su nombre en el idioma de la persona. format: xlsx (Excel, el de siempre) o pdf (para imprimir o mandar: una tabla con el logo del market, hasta '.self::PDF_MAX_COLUMNS.' columnas, así que en pdf elige las columnas). El archivo aparece en el chat con su botón para descargar; dile en una frase qué contiene.';
 
-    public const FORMATS = ['xlsx'];
+    public const FORMATS = ['xlsx', 'pdf'];
+
+    /**
+     * Columnas que caben en una página horizontal del PDF sin volverse ilegibles.
+     */
+    public const PDF_MAX_COLUMNS = 10;
 
     public const MAX_TITLE_CHARS = 120;
 
@@ -100,7 +105,7 @@ final class ExportFileTool
             return self::rejected('source tiene que traer tool (el nombre de una lectura) y arguments (un objeto).');
         }
 
-        if (in_array(trim($tool), [self::NAME, ShowChartTool::NAME, OfferChoicesTool::NAME], true)) {
+        if (in_array(trim($tool), [self::NAME, ExportDocumentTool::NAME, ShowChartTool::NAME, OfferChoicesTool::NAME], true)) {
             return self::rejected('source.tool tiene que ser una lectura de datos.');
         }
 
@@ -110,6 +115,10 @@ final class ExportFileTool
         if ($columns !== null && $columns !== []) {
             if (! is_array($columns) || ! array_is_list($columns) || count($columns) > self::MAX_COLUMNS) {
                 return self::rejected('columns tiene que ser una lista de hasta '.self::MAX_COLUMNS.' columnas.');
+            }
+
+            if ($format === 'pdf' && count($columns) > self::PDF_MAX_COLUMNS) {
+                return self::rejected('un pdf lleva hasta '.self::PDF_MAX_COLUMNS.' columnas: elige las que importan, o genera un xlsx con todas.');
             }
 
             $normalizedColumns = [];

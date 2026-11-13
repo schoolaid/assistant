@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Services\Evaluation;
 
+use SchoolAid\Assistant\Services\Anthropic\AnthropicSettings;
 use Closure;
 use Illuminate\Http\Client\Factory;
 use Psr\Http\Message\RequestInterface;
@@ -64,7 +65,7 @@ final class EvalHttpGuard
     {
         $hosts = array_map(
             fn (mixed $url): string => strtolower((string) parse_url((string) $url, PHP_URL_HOST)),
-            [config('prism.providers.anthropic.url'), config('scout.meilisearch.host')],
+            [AnthropicSettings::url(), config('scout.meilisearch.host')],
         );
 
         return array_values(array_unique(array_filter($hosts, fn (string $host): bool => $host !== '')));

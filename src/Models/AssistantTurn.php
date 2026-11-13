@@ -2,6 +2,8 @@
 
 namespace SchoolAid\Assistant\Models;
 
+use SchoolAid\Assistant\Models\Concerns\HasAssistantTable;
+use SchoolAid\Assistant\Models\Concerns\InWorkspace;
 use SchoolAid\Assistant\Enums\AssistantTurnStatusEnum;
 use Carbon\CarbonImmutable;
 use SchoolAid\Assistant\Database\Factories\AssistantTurnFactory;
@@ -26,7 +28,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  */
 class AssistantTurn extends Model
 {
-    use HasFactory;
+    use HasFactory, HasAssistantTable, InWorkspace;
+
+    public const TABLE = 'turns';
 
     protected $fillable = [
         'conversation_id', 'run_id', 'status', 'panel_context', 'iterations', 'error', 'started_at', 'finished_at',

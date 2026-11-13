@@ -21,7 +21,8 @@ vendor/bin/pest
 - `src/` and `database/factories/` are generated: do not edit them here, the next sync overwrites
   them. Change the code in MarketAid.
 - `overrides/` holds the files this package owns (its service provider). The sync copies them over
-  the generated ones.
+  the generated ones. `config/`, `database/migrations/` and `tests/` are also the package's own;
+  `resources/lang/` is copied from MarketAid.
 - What stays in MarketAid is listed in its `tests/Unit/Assistant/AssistantBoundaryTest.php`
   (`ASSISTANT_HOST_FILES`, plus the module's `Host/` folder). The sync reads that list.
 - A blocker is a reference from the engine to a class that is not in this package. The package is
@@ -45,13 +46,59 @@ in its own service provider:
 | `EntityLabels` | How the records a conversation touched are shown |
 | `PreviewDetails` | A preview as staff reads it on the Confirm card |
 | `PlatformGrant` | The platform's switch and budget for a workspace, by id |
+| `GuideScreens` | The panel screens a guide page talks about, as a given person sees them |
+| `Letterhead` | The name and logo on the PDFs the assistant builds |
 
 MarketAid's implementations are the reference: `app/Modules/Assistant/Host/` there.
 
-## Not in the package yet
+## Installing it in an app
 
-- Config, translations, routes and migrations: they are still MarketAid's files.
-- Table names are fixed (`assistant_*`) and the workspace tables assume one database per
-  workspace. An app with a single database, or one that already has an `assistant_conversations`
-  table, needs a table prefix and a workspace column first.
+The assistant has one name in the app: its config key, its translation file, the prefix of its
+tables and its rate limiter. The default is `assistant`. An app that already has something called
+"assistant" registers another name, in the `register()` of its own provider, and binds the
+contracts there:
+
+```php
+AssistantNaming::use('panel_assistant');   // config('panel_assistant.*'), tables panel_assistant_*
+```
+
+```bash
+php artisan vendor:publish --tag=assistant-config       # config/<name>.php, with the engine defaults
+php artisan vendor:publish --tag=assistant-lang         # lang/<locale>/<name>.php
+php artisan vendor:publish --tag=assistant-migrations   # two migrations: workspace and platform tables
+```
+
+Then, in the app:
+
+- **Routes**: call `AssistantRoutes::panel($prefix, $namePrefix)` inside the route group where the
+  session, the person and the workspace are already resolved. The package registers the rate
+  limiter (per workspace and person) under the assistant's name.
+- **Policy**: register the app's policy for the five workspace models; a conversation and what
+  hangs from it belong to their author.
+- **Queue**: a connection and a queue both named `assistant`, with their own worker.
+- **Config**: fill in what is the app's own in the published file: `core_tools`, `tool_groups`,
+  `panel_only`, `undo`, `entities`, `suggestions`. The published translations carry MarketAid's
+  texts for those sections; replace them.
+- **Anthropic**: `anthropic.api_key`, `anthropic.url` and `anthropic.version` in the published
+  config (`ANTHROPIC_API_KEY`…). Meilisearch comes from `scout.meilisearch.*`.
+
+### One database per workspace, or a single one
+
+- **One database per workspace** (MarketAid): leave `workspace_column` null and run the workspace
+  migration in each workspace database; the platform migration runs on `Workspace::sharedConnection()`.
+- **A single database** (SchoolAid): set `workspace_column` (for example `school_id`) before
+  migrating. Conversations, turns, messages, confirmations and exports then store the workspace
+  where they were created and are read only from it; outside a workspace they return no rows.
+  A command that must read across workspaces asks with `withoutGlobalScope(WorkspaceScope::class)`.
+- Queued jobs remember the workspace where they were dispatched and re-enter it with
+  `Workspace::run()`.
+
+`tests/SingleDatabase/` installs the package as a single-database app with another name: it runs
+the migrations and checks that rows do not cross between workspaces, and that config,
+translations, routes and the limiter follow the name.
+
+## Not done yet
+
+- No app requires the package. MarketAid keeps its own config, translations and migrations until
+  it switches; they are the source of the ones here.
 - The task eval (`assistant:eval`) stays in MarketAid.

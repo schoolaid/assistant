@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Console;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use SchoolAid\Assistant\Contracts\Workspace;
 use SchoolAid\Assistant\Contracts\WorkspaceNotFound;
 use SchoolAid\Assistant\Enums\AssistantExportStatusEnum;
@@ -96,7 +97,7 @@ class PruneAssistantDataCommand extends Command
      */
     private function pruneExports(string $label): void
     {
-        if (! Schema::hasTable('assistant_exports')) {
+        if (! Schema::hasTable(AssistantNaming::table('exports'))) {
             return;
         }
 
@@ -113,12 +114,12 @@ class PruneAssistantDataCommand extends Command
      */
     private function deleteExportFiles(Builder $exports, bool $markExpired = false): int
     {
-        if (! Schema::hasTable('assistant_exports')) {
+        if (! Schema::hasTable(AssistantNaming::table('exports'))) {
             return 0;
         }
 
         $count = 0;
-        $disk = Storage::disk((string) config('assistant.exports.disk'));
+        $disk = Storage::disk((string) AssistantNaming::config('exports.disk'));
 
         $exports->each(function (AssistantExport $export) use ($disk, $markExpired, &$count): void {
             if ($export->path !== null) {

@@ -45,7 +45,7 @@ class AnthropicApiKeyResolver
             return new ResolvedApiKey($general->api_key, AssistantKeySourceEnum::Said, $general);
         }
 
-        $key = (string) config('prism.providers.anthropic.api_key');
+        $key = AnthropicSettings::apiKey();
 
         if ($key === '') {
             throw new AnthropicRequestFailed('ANTHROPIC_API_KEY is not configured.');

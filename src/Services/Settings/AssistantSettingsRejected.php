@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Services\Settings;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use Illuminate\Contracts\Debug\ShouldntReport;
 use Illuminate\Http\JsonResponse;
 use RuntimeException;
@@ -29,7 +30,7 @@ class AssistantSettingsRejected extends RuntimeException implements ShouldntRepo
         public readonly array $errors,
         public readonly int $httpStatus = Response::HTTP_UNPROCESSABLE_ENTITY,
     ) {
-        parent::__construct((string) (collect($errors)->flatten()->first() ?? __("assistant.settings.{$errorCode}")));
+        parent::__construct((string) (collect($errors)->flatten()->first() ?? AssistantNaming::trans("settings.{$errorCode}")));
     }
 
     /**
@@ -37,7 +38,7 @@ class AssistantSettingsRejected extends RuntimeException implements ShouldntRepo
      */
     public static function on(string $field, string $code, array $replace = [], int $httpStatus = Response::HTTP_UNPROCESSABLE_ENTITY): self
     {
-        return new self($code, [$field => [__("assistant.settings.{$code}", $replace)]], $httpStatus);
+        return new self($code, [$field => [AssistantNaming::trans("settings.{$code}", $replace)]], $httpStatus);
     }
 
     public function render(): JsonResponse

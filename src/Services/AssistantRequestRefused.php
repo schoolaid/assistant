@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Services;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use Illuminate\Contracts\Debug\ShouldntReport;
 use Illuminate\Http\JsonResponse;
 use RuntimeException;
@@ -73,7 +74,7 @@ class AssistantRequestRefused extends RuntimeException implements ShouldntReport
     public function render(): JsonResponse
     {
         return response()->json([
-            'message' => __("assistant.errors.{$this->errorCode}"),
+            'message' => AssistantNaming::trans("errors.{$this->errorCode}"),
             'code' => $this->errorCode,
         ], $this->status);
     }

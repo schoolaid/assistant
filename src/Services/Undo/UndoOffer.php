@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Services\Undo;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use SchoolAid\Assistant\Contracts\WritePreviews;
 use SchoolAid\Assistant\Enums\AssistantConfirmationStatusEnum;
 use SchoolAid\Assistant\Models\AssistantConfirmation;
@@ -47,7 +48,7 @@ class UndoOffer
         }
 
         $summary = $preview->summary !== null && trim($preview->summary) !== '' ? $preview->summary : 'Deshacer '.$done->tool;
-        $windowEnds = now()->addMinutes((int) config('assistant.undo_minutes', 5));
+        $windowEnds = now()->addMinutes((int) AssistantNaming::config('undo_minutes', 5));
         $expiresAt = $preview->expiresAt !== null
             ? Carbon::parse($preview->expiresAt)->setTimezone((string) config('app.timezone'))
             : $windowEnds;
@@ -69,7 +70,7 @@ class UndoOffer
 
     private function planner(string $tool): ?UndoPlanner
     {
-        $class = config("assistant.undo.{$tool}");
+        $class = AssistantNaming::config("undo.{$tool}");
 
         return is_string($class) && is_subclass_of($class, UndoPlanner::class) ? app($class) : null;
     }

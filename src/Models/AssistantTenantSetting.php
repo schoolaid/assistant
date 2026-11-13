@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Models;
 
+use SchoolAid\Assistant\Models\Concerns\HasAssistantTable;
 use SchoolAid\Assistant\Models\Concerns\OnSharedConnection;
 use Illuminate\Database\Eloquent\Model;
 
@@ -14,9 +15,9 @@ use Illuminate\Database\Eloquent\Model;
  */
 class AssistantTenantSetting extends Model
 {
-    use OnSharedConnection;
+    use OnSharedConnection, HasAssistantTable;
 
-    protected $table = 'assistant_tenant_settings';
+    public const TABLE = 'tenant_settings';
 
     protected $fillable = ['tenant_id', 'own_key_allowed'];
 

@@ -2,6 +2,8 @@
 
 namespace SchoolAid\Assistant\Models;
 
+use SchoolAid\Assistant\Models\Concerns\HasAssistantTable;
+use SchoolAid\Assistant\Models\Concerns\InWorkspace;
 use SchoolAid\Assistant\Support\PanelUsers;
 use SchoolAid\Assistant\Enums\AssistantTurnStatusEnum;
 use Carbon\CarbonImmutable;
@@ -24,7 +26,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class AssistantConversation extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasAssistantTable, InWorkspace;
+
+    public const TABLE = 'conversations';
 
     private const KEPT_WRITE = 'has_kept_write';
 

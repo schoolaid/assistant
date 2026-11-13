@@ -103,7 +103,7 @@ final class OutputChecks
     }
 
     /**
-     * Los números de la respuesta (y de las gráficas pedidas) que no aparecen en los resultados de las tools ni en el
+     * Los números de la respuesta (y de las gráficas y los resúmenes en PDF pedidos) que no aparecen en los resultados de las tools ni en el
      * pedido, tal como se escribieron y sin repetir.
      *
      * @param  list<string>  $toolResults
@@ -123,6 +123,13 @@ final class OutputChecks
         $claimed = self::numbers($answer, skipNoise: true);
 
         foreach ($toolUses as $toolUse) {
+            // El resumen en PDF lo redacta el modelo: sus cifras cuentan como las de la respuesta.
+            if ($toolUse['name'] === self::DOCUMENT_TOOL && is_string($toolUse['input']['markdown'] ?? null)) {
+                array_push($claimed, ...self::numbers($toolUse['input']['markdown'], skipNoise: true));
+
+                continue;
+            }
+
             if ($toolUse['name'] !== self::CHART_TOOL) {
                 continue;
             }

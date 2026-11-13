@@ -10,8 +10,8 @@ use SchoolAid\Assistant\Support\AssistantActionEventMark;
 function packageClasses(): array
 {
     $roots = [
-        dirname(__DIR__).'/src' => 'SchoolAid\\Assistant',
-        dirname(__DIR__).'/database/factories' => 'SchoolAid\\Assistant\\Database\\Factories',
+        dirname(__DIR__, 2).'/src' => 'SchoolAid\\Assistant',
+        dirname(__DIR__, 2).'/database/factories' => 'SchoolAid\\Assistant\\Database\\Factories',
     ];
     $classes = [];
 
@@ -44,7 +44,7 @@ it('binds what the engine provides by itself', function () {
 
 it('references no MarketAid class', function () {
     foreach (packageClasses() as $relative => [$class]) {
-        $root = str_starts_with($relative, 'src/') ? dirname(__DIR__).'/' : dirname(__DIR__).'/database/';
+        $root = str_starts_with($relative, 'src/') ? dirname(__DIR__, 2).'/' : dirname(__DIR__, 2).'/database/';
         $code = (string) preg_replace('~/\*.*?\*/~s', '', (string) file_get_contents($root.$relative));
 
         expect(preg_match('/(^use |\\\\)(App|Said|Stancl)\\\\/m', $code))->toBe(0, $relative);

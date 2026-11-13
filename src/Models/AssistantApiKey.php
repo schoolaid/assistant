@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Models;
 
+use SchoolAid\Assistant\Models\Concerns\HasAssistantTable;
 use SchoolAid\Assistant\Enums\AssistantApiKeyStatusEnum;
 use SchoolAid\Assistant\Models\Concerns\OnSharedConnection;
 use Carbon\CarbonImmutable;
@@ -22,9 +23,9 @@ use Illuminate\Database\Eloquent\Model;
  */
 class AssistantApiKey extends Model
 {
-    use OnSharedConnection;
+    use OnSharedConnection, HasAssistantTable;
 
-    protected $table = 'assistant_api_keys';
+    public const TABLE = 'api_keys';
 
     protected $fillable = ['tenant_id', 'api_key', 'last4', 'status', 'verified_at', 'last_error', 'updated_by'];
 

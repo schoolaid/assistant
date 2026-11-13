@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Models;
 
+use SchoolAid\Assistant\Models\Concerns\HasAssistantTable;
 use SchoolAid\Assistant\Models\Concerns\OnSharedConnection;
 use Carbon\CarbonImmutable;
 use SchoolAid\Assistant\Database\Factories\AssistantUsageFactory;
@@ -23,9 +24,9 @@ use Illuminate\Database\Eloquent\Model;
  */
 class AssistantUsage extends Model
 {
-    use OnSharedConnection, HasFactory;
+    use OnSharedConnection, HasFactory, HasAssistantTable;
 
-    protected $table = 'assistant_usage';
+    public const TABLE = 'usage';
 
     protected $fillable = [
         'tenant_id', 'period', 'input_tokens', 'output_tokens', 'cache_read_tokens',

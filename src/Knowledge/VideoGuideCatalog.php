@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Knowledge;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -36,7 +37,7 @@ class VideoGuideCatalog
      */
     public function guides(): array
     {
-        $url = (string) config('assistant.knowledge.videos.catalog_url');
+        $url = (string) AssistantNaming::config('knowledge.videos.catalog_url');
 
         if ($url === '') {
             return [];

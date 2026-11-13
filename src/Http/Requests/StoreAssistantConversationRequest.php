@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Http\Requests;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -31,8 +32,8 @@ class StoreAssistantConversationRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'title.string' => __('assistant.validation.title_string'),
-            'title.max' => __('assistant.validation.title_max'),
+            'title.string' => AssistantNaming::trans('validation.title_string'),
+            'title.max' => AssistantNaming::trans('validation.title_max'),
         ];
     }
 }

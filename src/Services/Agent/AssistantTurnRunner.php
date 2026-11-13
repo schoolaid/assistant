@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Services\Agent;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use SchoolAid\Assistant\Contracts\Instructions;
 use SchoolAid\Assistant\Contracts\PanelScope;
 use SchoolAid\Assistant\Contracts\WritePreviews;
@@ -54,7 +55,8 @@ use UnexpectedValueException;
  *    pasa por el puente. `show-chart` también es local ({@see ShowChartTool}), pero no corta el turno: guarda un
  *    mensaje `chart` después de los resultados y el paso sigue. `export-file` ({@see ExportFileTool}) igual: valida y
  *    lee la primera página ({@see AssistantExportRequester}), guarda el archivo `pending` con su mensaje `file` y
- *    encola el Job que lo arma. `max_tokens` no corre un `tool_use` cortado; `refusal` termina con un aviso;
+ *    encola el Job que lo arma; `export-document` ({@see ExportDocumentTool}) lo mismo, con el markdown del modelo y sin
+ *    leer nada. `max_tokens` no corre un `tool_use` cortado; `refusal` termina con un aviso;
  *    `pause_turn` (la búsqueda de tools corre en el servidor) sigue en el paso siguiente con la
  *    respuesta tal cual. Solo se ejecutan los `tool_use`: `server_tool_use` y
  *    `tool_search_tool_result` se guardan y se reenvían sin tocar.
@@ -297,10 +299,10 @@ class AssistantTurnRunner
     private function payload(AssistantTurn $turn, array $messages): array
     {
         $payload = [
-            'model' => (string) config('assistant.model'),
-            'max_tokens' => (int) config('assistant.max_tokens'),
+            'model' => (string) AssistantNaming::config('model'),
+            'max_tokens' => (int) AssistantNaming::config('max_tokens'),
             'thinking' => ['type' => 'adaptive', 'block_binding' => ['prefix_mismatch_behavior' => 'drop_block']],
-            'output_config' => ['effort' => (string) config('assistant.effort')],
+            'output_config' => ['effort' => (string) AssistantNaming::config('effort')],
             'cache_control' => ['type' => 'ephemeral'],
             'fallbacks' => 'default',
             'system' => [['type' => 'text', 'text' => $this->systemPrompt($turn), 'cache_control' => $this->prefixCacheControl()]],
@@ -322,7 +324,7 @@ class AssistantTurnRunner
      */
     private function prefixCacheControl(): array
     {
-        return config('assistant.prefix_cache_ttl') === '1h'
+        return AssistantNaming::config('prefix_cache_ttl') === '1h'
             ? ['type' => 'ephemeral', 'ttl' => '1h']
             : ['type' => 'ephemeral'];
     }
@@ -353,9 +355,9 @@ class AssistantTurnRunner
      */
     private function toolDefinitions(): array
     {
-        $tools = [...array_values($this->tools->definitions()), OfferChoicesTool::definition(), ShowChartTool::definition(), ExportFileTool::definition()];
+        $tools = [...array_values($this->tools->definitions()), OfferChoicesTool::definition(), ShowChartTool::definition(), ExportFileTool::definition(), ExportDocumentTool::definition()];
 
-        if ((bool) config('assistant.tool_search.enabled', true)) {
+        if ((bool) AssistantNaming::config('tool_search.enabled', true)) {
             $tools[] = self::TOOL_SEARCH_TOOL;
         }
 
@@ -465,6 +467,17 @@ class AssistantTurnRunner
 
             if ($toolUse['name'] === ExportFileTool::NAME) {
                 $requested = $this->exports->request($turn, $toolUse['input'], count($exports));
+                $results[] = $this->toolResult($toolUse['id'], $requested['result'], $requested['isError']);
+
+                if ($requested['export'] !== null) {
+                    $exports[] = $requested['export'];
+                }
+
+                continue;
+            }
+
+            if ($toolUse['name'] === ExportDocumentTool::NAME) {
+                $requested = $this->exports->requestDocument($turn, $toolUse['input'], count($exports));
                 $results[] = $this->toolResult($toolUse['id'], $requested['result'], $requested['isError']);
 
                 if ($requested['export'] !== null) {
@@ -685,7 +698,7 @@ class AssistantTurnRunner
             }
 
             $iterations = $turn->iterations + 1;
-            $maxIterations = max(1, (int) config('assistant.max_iterations'));
+            $maxIterations = max(1, (int) AssistantNaming::config('max_iterations'));
 
             if ($outcome === StepOutcomeEnum::Continue && $iterations >= $maxIterations + ($paused ? 1 : 0)) {
                 $this->storeVisible($turn, AssistantMessageKindEnum::Text, $this->limitText($turn));
@@ -788,7 +801,7 @@ class AssistantTurnRunner
             'kind' => $kind,
             'content' => $response->content,
             'display_text' => $displayText ?? $response->text(),
-            'model' => $response->model !== '' ? $response->model : (string) config('assistant.model'),
+            'model' => $response->model !== '' ? $response->model : (string) AssistantNaming::config('model'),
             'stop_reason' => $response->stopReason !== '' ? Str::limit($response->stopReason, self::MAX_STOP_REASON_CHARS, '') : null,
             'input_tokens' => $response->inputTokens,
             'output_tokens' => $response->outputTokens,

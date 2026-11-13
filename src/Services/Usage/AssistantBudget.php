@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Services\Usage;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use SchoolAid\Assistant\Contracts\BudgetAlerts;
 use SchoolAid\Assistant\Contracts\Workspace;
 use SchoolAid\Assistant\Enums\AssistantKeySourceEnum;
@@ -186,7 +187,7 @@ class AssistantBudget
      */
     private function pricesFor(string $model): array
     {
-        $table = (array) config('assistant.pricing', []);
+        $table = (array) AssistantNaming::config('pricing', []);
 
         if (isset($table[$model])) {
             return (array) $table[$model];
@@ -238,7 +239,7 @@ class AssistantBudget
     private function warnSaidOnce(AssistantUsage $usage): void
     {
         $cap = $this->capUsd();
-        $ratio = (float) config('assistant.limits.warning_percent', 80) / 100;
+        $ratio = (float) AssistantNaming::config('limits.warning_percent', 80) / 100;
 
         if ($cap === null || $cap <= 0) {
             return;

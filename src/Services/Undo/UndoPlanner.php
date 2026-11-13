@@ -2,10 +2,11 @@
 
 namespace SchoolAid\Assistant\Services\Undo;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use SchoolAid\Assistant\Models\AssistantConfirmation;
 
 /**
- * Sabe invertir una escritura del grupo 1 ya confirmada. Hay uno por tool, en `config('assistant.undo')`.
+ * Sabe invertir una escritura del grupo 1 ya confirmada. Hay uno por tool, en `AssistantNaming::config('undo')`.
  */
 interface UndoPlanner
 {

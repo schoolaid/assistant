@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Http\Controllers\Admin;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use SchoolAid\Assistant\Http\Controllers\AssistantController;
 use SchoolAid\Assistant\Enums\AssistantExportStatusEnum;
 use SchoolAid\Assistant\Http\Resources\AssistantExportResource;
@@ -41,6 +42,6 @@ class AssistantExportController extends AssistantController
             return response()->json(['message' => 'El archivo todavía no está listo.', 'code' => 'assistant_export_not_ready'], 409);
         }
 
-        return Storage::disk((string) config('assistant.exports.disk'))->download($export->path, $export->filename());
+        return Storage::disk((string) AssistantNaming::config('exports.disk'))->download($export->path, $export->filename());
     }
 }

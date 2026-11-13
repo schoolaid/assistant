@@ -16,7 +16,7 @@ class PanelUsers
      */
     public static function model(): string
     {
-        return (string) config('assistant.user_model', config('auth.providers.users.model'));
+        return (string) AssistantNaming::config('user_model', config('auth.providers.users.model'));
     }
 
     /**

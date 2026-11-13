@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Services\Entities;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use SchoolAid\Assistant\Enums\AssistantConfirmationStatusEnum;
 use SchoolAid\Assistant\Enums\AssistantMessageKindEnum;
 use SchoolAid\Assistant\Models\AssistantConfirmation;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
  * con una tool y los que tocaron o crearon sus escrituras confirmadas. Sin columna propia: sale de los mensajes
  * guardados (como {@see \SchoolAid\Assistant\Support\AssistantTurnSteps}) y de las confirmaciones.
  *
- * Qué argumento o clave del resultado de cada tool es un registro lo dice `config('assistant.entities')`: por tool, una
+ * Qué argumento o clave del resultado de cada tool es un registro lo dice `AssistantNaming::config('entities')`: por tool, una
  * lista de `{type, id, model_key?, date?}` con rutas `input.<arg>` (los argumentos de la llamada) o `result.<clave>`
  * (lo que devolvió la escritura al confirmarse; un registro por esa ruta es uno que la escritura creó).
  */
@@ -117,7 +118,7 @@ final class AssistantEntityExtractor
     {
         $refs = [];
 
-        foreach ((array) (config('assistant.entities', [])[$tool] ?? []) as $mapping) {
+        foreach ((array) (AssistantNaming::config('entities', [])[$tool] ?? []) as $mapping) {
             $id = $this->id(data_get($call, $mapping['id']));
             $modelKey = isset($mapping['model_key']) ? data_get($call, $mapping['model_key']) : null;
             $date = isset($mapping['date']) ? data_get($call, $mapping['date']) : null;

@@ -14,10 +14,17 @@ use RuntimeException;
  *   hay que acotar con filtros.
  *
  * Cada fila se aplana a columnas: lo anidado con punto (`customer.name`), un monto `{amount, currency}` como número con
- * su moneda en la columna, y una lista de valores como texto separado por comas.
+ * su moneda en la columna (también un número con nombre de monto junto a un `currency` de la misma fila, ver
+ * {@see self::MONEY_FIELD}), y una lista de valores como texto separado por comas.
  */
 final class AssistantExportRows
 {
+    /**
+     * Campos que son montos cuando la fila trae su moneda aparte (`{balance: 110, currency: "GTQ"}`, como
+     * `list-accounts-receivable`): por el nombre, porque `daysOverdue` o `receiptNumber` también son números.
+     */
+    private const MONEY_FIELD = '/(amount|total|balance|charges?|paid|price|subtotal|discount|tax|debt|owed|refund|fee)s?$/i';
+
     /**
      * La página leída, o null si la respuesta no tiene una forma exportable.
      *
@@ -84,9 +91,17 @@ final class AssistantExportRows
     {
         $values = [];
         $currencies = [];
+        $siblingCurrency = is_string($row['currency'] ?? null) && preg_match('/^[A-Z]{3}$/', $row['currency']) === 1 ? $row['currency'] : null;
 
         foreach ($row as $key => $value) {
             $column = $prefix.$key;
+
+            if ($siblingCurrency !== null && is_numeric($value) && ! is_string($value) && preg_match(self::MONEY_FIELD, (string) $key) === 1) {
+                $values[$column] = (float) $value;
+                $currencies[$column] = $siblingCurrency;
+
+                continue;
+            }
 
             if (is_array($value) && self::isMoney($value)) {
                 $values[$column] = is_numeric($value['amount']) ? (float) $value['amount'] : null;

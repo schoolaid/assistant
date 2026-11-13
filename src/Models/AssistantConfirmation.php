@@ -2,6 +2,8 @@
 
 namespace SchoolAid\Assistant\Models;
 
+use SchoolAid\Assistant\Models\Concerns\HasAssistantTable;
+use SchoolAid\Assistant\Models\Concerns\InWorkspace;
 use SchoolAid\Assistant\Contracts\WritePreviews;
 use SchoolAid\Assistant\Enums\AssistantConfirmationStatusEnum;
 use Carbon\CarbonImmutable;
@@ -30,7 +32,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  */
 class AssistantConfirmation extends Model
 {
-    use HasFactory;
+    use HasFactory, HasAssistantTable, InWorkspace;
+
+    public const TABLE = 'confirmations';
 
     protected $fillable = [
         'turn_id', 'conversation_id', 'message_id', 'tool', 'arguments', 'summary', 'preview',

@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Http\Requests;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -35,12 +36,12 @@ class StoreAssistantMessageRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'content.required_without' => __('assistant.validation.content_required'),
-            'content.string' => __('assistant.validation.content_string'),
-            'content.max' => __('assistant.validation.content_max'),
-            'choice_id.string' => __('assistant.validation.choice_id_string'),
-            'choice_id.max' => __('assistant.validation.choice_id_string'),
-            'choice_id.prohibits' => __('assistant.validation.choice_id_with_content'),
+            'content.required_without' => AssistantNaming::trans('validation.content_required'),
+            'content.string' => AssistantNaming::trans('validation.content_string'),
+            'content.max' => AssistantNaming::trans('validation.content_max'),
+            'choice_id.string' => AssistantNaming::trans('validation.choice_id_string'),
+            'choice_id.max' => AssistantNaming::trans('validation.choice_id_string'),
+            'choice_id.prohibits' => AssistantNaming::trans('validation.choice_id_with_content'),
         ];
     }
 }

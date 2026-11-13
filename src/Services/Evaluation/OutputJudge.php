@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Services\Evaluation;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use SchoolAid\Assistant\Services\Anthropic\AnthropicMessagesClient;
 use SchoolAid\Assistant\Services\Usage\AssistantBudget;
 use JsonException;
@@ -44,7 +45,7 @@ TEXT;
         $criteria = implode("\n", array_map(fn (string $key, string $text): string => "- {$key}: {$text}", array_keys(self::CRITERIA), self::CRITERIA));
 
         $response = $this->client->create([
-            'model' => (string) config('assistant.model'),
+            'model' => (string) AssistantNaming::config('model'),
             'max_tokens' => self::MAX_TOKENS,
             'output_config' => ['effort' => 'low', 'format' => ['type' => 'json_schema', 'schema' => $this->schema()]],
             'system' => self::SYSTEM."\n\nCriterios:\n".$criteria,

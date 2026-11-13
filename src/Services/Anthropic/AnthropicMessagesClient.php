@@ -58,7 +58,7 @@ class AnthropicMessagesClient
     {
         $headers = [
             'x-api-key' => $key->key,
-            'anthropic-version' => (string) config('prism.providers.anthropic.version'),
+            'anthropic-version' => AnthropicSettings::version(),
         ];
 
         if ($betas !== []) {
@@ -109,7 +109,7 @@ class AnthropicMessagesClient
             $response = Http::withHeaders($headers)
                 ->timeout(self::TIMEOUT_SECONDS)
                 ->acceptJson()
-                ->post(rtrim((string) config('prism.providers.anthropic.url'), '/').'/messages', $payload);
+                ->post(AnthropicSettings::url().'/messages', $payload);
         } catch (ConnectionException $exception) {
             throw new AnthropicRequestFailed('Anthropic request failed: '.$exception->getMessage(), connectionFailed: true);
         }
