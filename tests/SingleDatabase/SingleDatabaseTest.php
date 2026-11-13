@@ -133,3 +133,13 @@ it('keeps the platform tables outside the workspace scope, keyed by tenant_id', 
     expect(AssistantUsage::query()->count())->toBe(2)
         ->and(DB::table('panel_assistant_usage')->count())->toBe(2);
 });
+
+it('can run the migrations again without touching what is there', function () {
+    confirmationIn('1');
+
+    foreach ($this->migrations() as $migration) {
+        $migration->up();
+    }
+
+    expect(DB::table('panel_assistant_confirmations')->count())->toBe(1);
+});

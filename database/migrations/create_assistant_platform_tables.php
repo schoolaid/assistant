@@ -16,9 +16,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        $schema = $this->schema();
-
-        $schema->create(AssistantNaming::table('usage'), function (Blueprint $table): void {
+        $this->createUnlessExists(AssistantNaming::table('usage'), function (Blueprint $table): void {
             $table->id();
             $table->string('tenant_id', 191);
             $table->char('period', 7);
@@ -34,7 +32,7 @@ return new class extends Migration
             $table->unique(['tenant_id', 'period']);
         });
 
-        $schema->create(AssistantNaming::table('user_usage'), function (Blueprint $table): void {
+        $this->createUnlessExists(AssistantNaming::table('user_usage'), function (Blueprint $table): void {
             $table->id();
             $table->string('tenant_id', 191);
             $table->unsignedBigInteger('user_id');
@@ -45,7 +43,7 @@ return new class extends Migration
             $table->unique(['tenant_id', 'period', 'user_id']);
         });
 
-        $schema->create(AssistantNaming::table('api_keys'), function (Blueprint $table): void {
+        $this->createUnlessExists(AssistantNaming::table('api_keys'), function (Blueprint $table): void {
             $table->id();
             $table->string('tenant_id', 191)->nullable()->unique();
             $table->text('api_key');
@@ -57,7 +55,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        $schema->create(AssistantNaming::table('limits'), function (Blueprint $table): void {
+        $this->createUnlessExists(AssistantNaming::table('limits'), function (Blueprint $table): void {
             $table->id();
             $table->string('tenant_id', 191)->nullable();
             $table->string('limit_key', 40);
@@ -69,7 +67,7 @@ return new class extends Migration
             $table->unique(['tenant_id', 'limit_key']);
         });
 
-        $schema->create(AssistantNaming::table('tenant_settings'), function (Blueprint $table): void {
+        $this->createUnlessExists(AssistantNaming::table('tenant_settings'), function (Blueprint $table): void {
             $table->id();
             $table->string('tenant_id', 191)->unique();
             $table->boolean('own_key_allowed')->default(false);
@@ -81,6 +79,16 @@ return new class extends Migration
     {
         foreach (['tenant_settings', 'limits', 'api_keys', 'user_usage', 'usage'] as $table) {
             $this->schema()->dropIfExists(AssistantNaming::table($table));
+        }
+    }
+
+    /**
+     * A hand-run can be repeated: a table that is already there is left as it is.
+     */
+    private function createUnlessExists(string $table, Closure $blueprint): void
+    {
+        if (! $this->schema()->hasTable($table)) {
+            $this->schema()->create($table, $blueprint);
         }
     }
 

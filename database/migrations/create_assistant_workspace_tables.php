@@ -20,7 +20,7 @@ return new class extends Migration
         $turns = AssistantNaming::table('turns');
         $messages = AssistantNaming::table('messages');
 
-        Schema::create($conversations, function (Blueprint $table): void {
+        $this->createUnlessExists($conversations, function (Blueprint $table): void {
             $table->id();
             $this->workspaceColumn($table);
             $table->unsignedBigInteger('user_id')->index();
@@ -30,7 +30,7 @@ return new class extends Migration
             $table->softDeletes();
         });
 
-        Schema::create($turns, function (Blueprint $table) use ($conversations): void {
+        $this->createUnlessExists($turns, function (Blueprint $table) use ($conversations): void {
             $table->id();
             $this->workspaceColumn($table);
             $table->foreignId('conversation_id')->constrained($conversations)->cascadeOnDelete();
@@ -46,7 +46,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create($messages, function (Blueprint $table) use ($conversations, $turns): void {
+        $this->createUnlessExists($messages, function (Blueprint $table) use ($conversations, $turns): void {
             $table->id();
             $this->workspaceColumn($table);
             $table->foreignId('conversation_id')->constrained($conversations)->cascadeOnDelete();
@@ -69,7 +69,7 @@ return new class extends Migration
             $table->index(['conversation_id', 'id']);
         });
 
-        Schema::create(AssistantNaming::table('confirmations'), function (Blueprint $table) use ($conversations, $turns, $messages): void {
+        $this->createUnlessExists(AssistantNaming::table('confirmations'), function (Blueprint $table) use ($conversations, $turns, $messages): void {
             $table->id();
             $this->workspaceColumn($table);
             $table->foreignId('turn_id')->constrained($turns)->cascadeOnDelete();
@@ -88,7 +88,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create(AssistantNaming::table('exports'), function (Blueprint $table) use ($conversations, $turns): void {
+        $this->createUnlessExists(AssistantNaming::table('exports'), function (Blueprint $table) use ($conversations, $turns): void {
             $table->uuid('id')->primary();
             $this->workspaceColumn($table);
             $table->foreignId('conversation_id')->constrained($conversations)->cascadeOnDelete();
@@ -111,6 +111,16 @@ return new class extends Migration
     {
         foreach (['exports', 'confirmations', 'messages', 'turns', 'conversations'] as $table) {
             Schema::dropIfExists(AssistantNaming::table($table));
+        }
+    }
+
+    /**
+     * A hand-run can be repeated: a table that is already there is left as it is.
+     */
+    private function createUnlessExists(string $table, Closure $blueprint): void
+    {
+        if (! Schema::hasTable($table)) {
+            Schema::create($table, $blueprint);
         }
     }
 
