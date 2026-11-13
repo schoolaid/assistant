@@ -1,0 +1,44 @@
+{
+    "name": "schoolaid/assistant",
+    "description": "Panel assistant engine for SAID apps: an agent loop over the app's own MCP tools, with previews that only a person confirms.",
+    "type": "library",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.3",
+        "laravel/framework": "^11.0|^12.0",
+        "laravel/mcp": "^0.5.9",
+        "maatwebsite/excel": "^3.1",
+        "symfony/yaml": "^7.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^9.0|^10.0",
+        "pestphp/pest": "^3.0",
+        "pestphp/pest-plugin-laravel": "^3.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "SchoolAid\\Assistant\\": "src/",
+            "SchoolAid\\Assistant\\Database\\Factories\\": "database/factories/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "SchoolAid\\Assistant\\Tests\\": "tests/"
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "extra": {
+        "laravel": {
+            "providers": [
+                "SchoolAid\\Assistant\\Providers\\AssistantServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        },
+        "sort-packages": true
+    }
+}

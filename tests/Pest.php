@@ -1,0 +1,5 @@
+<?php
+
+use SchoolAid\Assistant\Tests\TestCase;
+
+uses(TestCase::class)->in(__DIR__);
