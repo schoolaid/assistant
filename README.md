@@ -4,8 +4,9 @@ The panel assistant engine shared by SAID apps: an agent loop that calls the app
 in process, as the person using the panel and with their permissions. Every write ends in a
 preview; only that person's click on Confirm runs it.
 
-**Status: generated, not yet consumed.** The engine still lives in MarketAid
-(`app/Modules/Assistant`) and this package is produced from it. No app requires it yet.
+**Status: generated from MarketAid.** The engine still lives in MarketAid
+(`app/Modules/Assistant`) and this package is produced from it. SchoolAid requires it (on a
+branch, as `panel_assistant`); MarketAid does not yet.
 
 ## How the source gets here
 
@@ -101,6 +102,8 @@ translations, routes and the limiter follow the name.
 
 ## Not done yet
 
-- No app requires the package. MarketAid keeps its own config, translations and migrations until
-  it switches; they are the source of the ones here.
+- MarketAid does not require the package: it keeps its own copy of the engine, config,
+  translations and migrations until it switches; they are the source of the ones here.
+- A change of schema after `v0.1.0` needs a new migration in each app that already published
+  the first two.
 - The task eval (`assistant:eval`) stays in MarketAid.
