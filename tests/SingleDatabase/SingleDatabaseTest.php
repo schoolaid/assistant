@@ -143,3 +143,26 @@ it('can run the migrations again without touching what is there', function () {
 
     expect(DB::table('panel_assistant_confirmations')->count())->toBe(1);
 });
+
+it('makes the workspace column numeric when the app says its workspace ids are', function () {
+    foreach (array_reverse($this->migrations()) as $migration) {
+        $migration->down();
+    }
+
+    config(['panel_assistant.workspace_column_type' => 'integer']);
+
+    foreach ($this->migrations() as $migration) {
+        $migration->up();
+    }
+
+    $confirmation = confirmationIn('2');
+    $this->workspace()->current = '2';
+
+    expect(Schema::getColumnType('panel_assistant_turns', 'school_id'))->toBe('integer')
+        ->and(DB::table('panel_assistant_turns')->value('school_id'))->toBe(2)
+        ->and(AssistantTurn::query()->find($confirmation->turn_id))->not->toBeNull();
+
+    $this->workspace()->current = '1';
+
+    expect(AssistantTurn::query()->find($confirmation->turn_id))->toBeNull();
+});

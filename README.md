@@ -89,7 +89,7 @@ Then, in the app:
 - **One database per workspace** (MarketAid): leave `workspace_column` null and run the workspace
   migration in each workspace database; the platform migration runs on `Workspace::sharedConnection()`.
 - **A single database** (SchoolAid): set `workspace_column` (for example `school_id`) before
-  migrating. Conversations, turns, messages, confirmations and exports then store the workspace
+  migrating, and `workspace_column_type` to `integer` when the ids are numeric. Conversations, turns, messages, confirmations and exports then store the workspace
   where they were created and are read only from it; outside a workspace they return no rows.
   A command that must read across workspaces asks with `withoutGlobalScope(WorkspaceScope::class)`.
 - Queued jobs remember the workspace where they were dispatched and re-enter it with

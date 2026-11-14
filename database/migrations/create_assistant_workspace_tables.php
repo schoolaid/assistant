@@ -9,8 +9,9 @@ use SchoolAid\Assistant\Support\AssistantNaming;
  * The tables that belong to a workspace: conversations, turns, messages, confirmations and exports.
  *
  * An app with one database per workspace runs this in each of them. An app with a single database
- * sets `workspace_column` in the assistant config before migrating: every table then gets that
- * column (indexed) and the models only read the rows of the current workspace.
+ * sets `workspace_column` (and `workspace_column_type`) in the assistant config before migrating:
+ * every table then gets that column (indexed) and the models only read the rows of the current
+ * workspace.
  */
 return new class extends Migration
 {
@@ -125,13 +126,21 @@ return new class extends Migration
     }
 
     /**
-     * The workspace id is a string in the engine (`Workspace::id()`); a numeric id is stored as its digits.
+     * The workspace id is a string in the engine (`Workspace::id()`). An app whose workspaces
+     * have numeric ids sets `workspace_column_type` to `integer`, so the column matches its other
+     * foreign keys; a numeric string compares and stores as its number.
      */
     private function workspaceColumn(Blueprint $table): void
     {
         $column = AssistantNaming::config('workspace_column');
 
-        if ($column !== null) {
+        if ($column === null) {
+            return;
+        }
+
+        if (AssistantNaming::config('workspace_column_type', 'string') === 'integer') {
+            $table->unsignedBigInteger($column)->index();
+        } else {
             $table->string($column, 191)->index();
         }
     }

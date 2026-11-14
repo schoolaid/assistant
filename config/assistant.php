@@ -33,6 +33,7 @@ return [
     | own database. Set it before running the migrations.
     */
     'workspace_column' => null,
+    'workspace_column_type' => 'string', // or 'integer', when the workspace ids are numeric
 
     /*
     | Defaults for the limits until the platform sets its own (AssistantLimitEnum::builtInDefault()).
