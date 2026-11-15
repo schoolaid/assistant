@@ -80,7 +80,10 @@ Then, in the app:
 - **Schedule**: `assistant:resume-stale-turns` every minute (it picks up a step whose worker
   died) and `assistant:prune` daily.
 - **Config**: fill in what is the app's own in the published file: `core_tools`, `tool_groups`,
-  `panel_only`, `undo`, `entities`, `suggestions`. The published translations carry MarketAid's
+  `panel_only`, `undo`, `entities`, `suggestions`, and `tool_descriptions`: the engine describes
+  its own four tools (`offer-choices`, `show-chart`, `export-file`, `export-document`) to the model
+  with MarketAid's records and tool names, so another app writes its own. `exports.creator` signs
+  the files it builds. The published translations carry MarketAid's
   texts for those sections; replace them.
 - **Anthropic**: `anthropic.api_key`, `anthropic.url` and `anthropic.version` in the published
   config (`ANTHROPIC_API_KEY`…). Meilisearch comes from `scout.meilisearch.*`.

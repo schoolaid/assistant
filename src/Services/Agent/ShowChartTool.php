@@ -2,6 +2,8 @@
 
 namespace SchoolAid\Assistant\Services\Agent;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
+
 /**
  * `show-chart`: el modelo muestra en el chat una gráfica de números que ya leyó de una tool.
  *
@@ -48,7 +50,7 @@ final class ShowChartTool
     {
         return [
             'name' => self::NAME,
-            'description' => self::DESCRIPTION,
+            'description' => AssistantNaming::toolDescription(self::NAME, self::DESCRIPTION),
             'input_schema' => [
                 'type' => 'object',
                 'properties' => [

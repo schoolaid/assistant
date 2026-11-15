@@ -2,6 +2,8 @@
 
 namespace SchoolAid\Assistant\Services\Agent;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
+
 /**
  * `offer-choices`: el modelo le pide a la persona que elija con botones en vez de listar opciones en texto.
  *
@@ -46,7 +48,7 @@ final class OfferChoicesTool
     {
         return [
             'name' => self::NAME,
-            'description' => self::DESCRIPTION,
+            'description' => AssistantNaming::toolDescription(self::NAME, self::DESCRIPTION),
             'input_schema' => [
                 'type' => 'object',
                 'properties' => [

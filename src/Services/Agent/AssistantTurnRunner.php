@@ -80,7 +80,7 @@ class AssistantTurnRunner
 
     public const REFUSAL_MESSAGE = 'No puedo ayudar con ese pedido.';
 
-    public const API_KEY_REJECTED_MESSAGE = 'La llave de API del market dejó de funcionar: quien administra el asistente tiene que cambiarla o quitarla en la configuración.';
+    public const API_KEY_REJECTED_MESSAGE = 'La llave de API propia dejó de funcionar: quien administra el asistente tiene que cambiarla o quitarla en la configuración.';
 
     public const PENDING_CONFIRMATION_RESULT = 'No ejecutado: hay una confirmación pendiente.';
 

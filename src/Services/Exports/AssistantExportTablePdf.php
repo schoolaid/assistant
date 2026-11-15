@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Services\Exports;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use Dompdf\Canvas;
 use Dompdf\CanvasFactory;
 use Dompdf\Dompdf;
@@ -80,7 +81,7 @@ final class AssistantExportTablePdf
         $this->regular = (string) $this->metrics->getFont('DejaVu Sans', 'normal');
         $this->bold = (string) $this->metrics->getFont('DejaVu Sans', 'bold');
         $this->canvas->add_info('Title', $title);
-        $this->canvas->add_info('Creator', 'MarketAid · asistente');
+        $this->canvas->add_info('Creator', AssistantNaming::exportCreator());
 
         $this->widths = $this->columnWidths($headings, $rows);
         $this->drawHeader($commerce, $title, $meta);

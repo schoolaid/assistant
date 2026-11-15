@@ -17,6 +17,8 @@ final class AssistantNaming
 {
     public const DEFAULT = 'assistant';
 
+    public const DEFAULT_EXPORT_CREATOR = 'MarketAid · asistente';
+
     private static string $name = self::DEFAULT;
 
     /**
@@ -70,5 +72,28 @@ final class AssistantNaming
         $line = __(self::langKey($key), $replace);
 
         return is_string($line) ? $line : self::langKey($key);
+    }
+
+    /**
+     * Cómo lee el modelo una tool del motor (`offer-choices`, `show-chart`, `export-file`, `export-document`): con la
+     * descripción de la app (`tool_descriptions.<tool>` de su config) o, si no da una, con la del motor. Las del motor
+     * hablan de MarketAid (clientes, planes, sucursales, sus tools); otra app pone las suyas. Sale de la config y no de
+     * las traducciones porque va en el prefijo cacheado de cada llamada: tiene que ser igual para todos los usuarios.
+     */
+    public static function toolDescription(string $tool, string $default): string
+    {
+        $own = self::config('tool_descriptions.'.$tool);
+
+        return is_string($own) && trim($own) !== '' ? $own : $default;
+    }
+
+    /**
+     * Quién firma los archivos que arma el asistente (propiedades del Excel y del PDF): `exports.creator` de la config.
+     */
+    public static function exportCreator(): string
+    {
+        $creator = self::config('exports.creator');
+
+        return is_string($creator) && trim($creator) !== '' ? $creator : self::DEFAULT_EXPORT_CREATOR;
     }
 }

@@ -44,10 +44,12 @@ return [
     ],
 
     /*
-    | Files the assistant builds with `export-file`. `disk` must be private.
+    | Files the assistant builds with `export-file`. `disk` must be private. `creator` signs the
+    | files (properties of the Excel and of the PDF); null leaves the engine's, which names MarketAid.
     */
     'exports' => [
         'disk' => env('ASSISTANT_EXPORTS_DISK', 's3'),
+        'creator' => null,
         'directory' => 'assistant-exports',
         'max_rows' => ['xlsx' => 5000, 'pdf' => 1000],
         'per_hour' => 10,
@@ -73,6 +75,15 @@ return [
     'tool_groups' => [],
     'subscription_action_groups' => [],
     'panel_only' => [],
+
+    /*
+    | How the model reads the engine's own tools, by name: `offer-choices`, `show-chart`,
+    | `export-file`, `export-document`. The engine's descriptions talk about MarketAid (customers,
+    | plans, branch offices, its tools): another app writes its own here, with its records and the
+    | names of its reading tools. A tool without an entry keeps the engine's. They are config and
+    | not translations because they sit in the cached prefix of every call: the same for everyone.
+    */
+    'tool_descriptions' => [],
 
     /*
     | Undo planners by tool name (class-string of an UndoPlanner) and how long the offer lasts.

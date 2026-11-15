@@ -2,6 +2,8 @@
 
 namespace SchoolAid\Assistant\Services\Agent;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
+
 /**
  * `export-document`: el modelo redacta un resumen (markdown) y el backend lo pasa a PDF con la plantilla del market.
  *
@@ -33,7 +35,7 @@ final class ExportDocumentTool
     {
         return [
             'name' => self::NAME,
-            'description' => self::DESCRIPTION,
+            'description' => AssistantNaming::toolDescription(self::NAME, self::DESCRIPTION),
             'input_schema' => [
                 'type' => 'object',
                 'properties' => [

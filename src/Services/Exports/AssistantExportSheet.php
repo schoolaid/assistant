@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Services\Exports;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
@@ -92,7 +93,7 @@ final class AssistantExportSheet implements FromArray, ShouldAutoSize, WithColum
 
     public function properties(): array
     {
-        return ['title' => $this->title, 'creator' => 'MarketAid · asistente'];
+        return ['title' => $this->title, 'creator' => AssistantNaming::exportCreator()];
     }
 
     public function registerEvents(): array

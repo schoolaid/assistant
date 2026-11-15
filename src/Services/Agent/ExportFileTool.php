@@ -2,6 +2,8 @@
 
 namespace SchoolAid\Assistant\Services\Agent;
 
+use SchoolAid\Assistant\Support\AssistantNaming;
+
 /**
  * `export-file`: el modelo pide un archivo con los datos de una lectura; nunca escribe las filas.
  *
@@ -44,7 +46,7 @@ final class ExportFileTool
     {
         return [
             'name' => self::NAME,
-            'description' => self::DESCRIPTION,
+            'description' => AssistantNaming::toolDescription(self::NAME, self::DESCRIPTION),
             'input_schema' => [
                 'type' => 'object',
                 'properties' => [

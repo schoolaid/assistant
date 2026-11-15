@@ -3,8 +3,8 @@
 namespace SchoolAid\Assistant\Services\Evaluation;
 
 /**
- * Las preguntas que el agente habría registrado con `report-unanswered-question` durante el eval
- * ({@see EvalUnansweredQuestionTool}): el comando las imprime por tarea en vez de dejarlas en la central.
+ * Las preguntas, con su motivo entre corchetes, que el agente habría registrado con `report-unanswered-question`
+ * durante el eval ({@see EvalUnansweredQuestionTool}): el comando las imprime por tarea en vez de dejarlas en la central.
  */
 final class EvalUnansweredQuestions
 {
