@@ -47,6 +47,9 @@ use UnexpectedValueException;
  *    mira lo guardado ({@see self::resumeFromStored()}): una confirmación pendiente, unos
  *    `tool_use` sin resultados o una respuesta final se retoman sin volver a llamarla. Si no, llama
  *    la API con la conversación entera ({@see ConversationTranscript}) y guarda la respuesta cruda.
+ *    Si el turno empieza con la conversación sobre `assistant.summarize_at_input_tokens`, este paso es el de resumen
+ *    ({@see self::summarize()}): guarda un mensaje `summary` y el paso siguiente hace la llamada normal sobre el
+ *    historial ya resumido. No cuenta en `iterations`.
  * 3. Según `stop_reason`: `end_turn` termina; `tool_use` corre los `tool_use` en orden y guarda un
  *    solo mensaje `user` interno con todos los `tool_result`; lo primero que llegue entre una vista
  *    previa de escritura (crea la confirmación: el turno espera el clic) y un `offer-choices`
@@ -118,6 +121,11 @@ class AssistantTurnRunner
      */
     private const MAX_STOP_REASON_CHARS = 32;
 
+    /**
+     * Tope de la llamada de resumen si la config de la app no trae `summary.max_tokens`.
+     */
+    private const SUMMARY_MAX_TOKENS = 8192;
+
     public function __construct(
         private readonly AnthropicMessagesClient $client,
         private readonly AssistantBudget $budget,
@@ -127,6 +135,7 @@ class AssistantTurnRunner
         private readonly ConversationTranscript $transcript,
         private readonly AssistantExportRequester $exports,
         private readonly WritePreviews $previews,
+        private readonly ConversationSummary $summary,
     ) {
     }
 
@@ -200,6 +209,10 @@ class AssistantTurnRunner
             return $resumed;
         }
 
+        if ($this->summary->due($turn)) {
+            return $this->summarize($turn);
+        }
+
         $messages = $this->transcript->toApiMessages($turn->conversation);
         $response = $this->client->create($this->payload($turn, $messages), self::BETAS);
         $this->budget->record($response, (int) ($turn->panel_context['user_id'] ?? 0) ?: null);
@@ -212,6 +225,70 @@ class AssistantTurnRunner
             'refusal' => $this->closeStep($turn, StepOutcomeEnum::Completed, fn () => $this->storeRefusal($turn, $response)),
             default => $this->unexpectedStop($turn, $response),
         };
+    }
+
+    /**
+     * El paso de resumen de un turno que empieza con la conversación sobre `assistant.summarize_at_input_tokens`
+     * ({@see ConversationSummary}): le pide al modelo que resuma todo lo anterior a este turno y lo guarda como un
+     * mensaje `summary`. El paso siguiente hace la llamada normal, ya sobre el historial resumido.
+     *
+     * El pedido es el de siempre ({@see self::payload()}: mismo `model`, `system`, `tools`, `thinking`, `output_config`
+     * y `cache_control`) con las instrucciones de resumen al final, así lee de la caché lo que dejó el turno anterior y
+     * los bloques `thinking` del historial siguen valiendo en esta llamada. No lleva `tool_choice`: cambiarlo invalida
+     * la caché de los mensajes; que no llame tools se lo piden las instrucciones. Solo cambia `max_tokens`.
+     *
+     * No cuenta como iteración del turno: no es trabajo del pedido.
+     */
+    private function summarize(AssistantTurn $turn): StepOutcomeEnum
+    {
+        $conversation = $turn->conversation;
+        $firstOfTurn = (int) AssistantMessage::query()->where('turn_id', $turn->id)->min('id');
+        $through = (int) AssistantMessage::query()
+            ->where('conversation_id', $conversation->id)
+            ->where('id', '<', $firstOfTurn)
+            ->max('id');
+
+        $messages = $this->withSummaryRequest($this->transcript->toApiMessages($conversation, $firstOfTurn));
+        $payload = [
+            ...$this->payload($turn, $messages),
+            'max_tokens' => (int) (AssistantNaming::config('summary.max_tokens') ?: self::SUMMARY_MAX_TOKENS),
+        ];
+
+        $response = $this->client->create($payload, self::BETAS);
+        $this->budget->record($response, (int) ($turn->panel_context['user_id'] ?? 0) ?: null);
+        $summary = trim($response->text());
+
+        if ($response->stopReason === 'end_turn' && $summary !== '') {
+            return $this->closeStep(
+                $turn,
+                StepOutcomeEnum::Continue,
+                fn () => $this->summary->store($turn, $response, $summary, $through),
+                counts: false,
+            );
+        }
+
+        return $this->unexpectedStop($turn, $response);
+    }
+
+    /**
+     * La conversación con las instrucciones de resumen al final, en un mensaje `user` (dentro del último si ya lo es:
+     * la API exige alternar).
+     *
+     * @param  list<array{role: string, content: list<array<string, mixed>>}>  $messages
+     * @return list<array{role: string, content: list<array<string, mixed>>}>
+     */
+    private function withSummaryRequest(array $messages): array
+    {
+        $request = ['type' => 'text', 'text' => $this->summary->instructions()];
+        $last = array_key_last($messages);
+
+        if ($last !== null && $messages[$last]['role'] === 'user') {
+            $messages[$last]['content'][] = $request;
+
+            return $messages;
+        }
+
+        return [...$messages, ['role' => 'user', 'content' => [$request]]];
     }
 
     /**
@@ -688,19 +765,19 @@ class AssistantTurnRunner
      * @param  (Closure(): mixed)|null  $writes
      * @param  array<string, mixed>  $attributes
      */
-    private function closeStep(AssistantTurn $turn, StepOutcomeEnum $outcome, ?Closure $writes = null, array $attributes = [], bool $paused = false): StepOutcomeEnum
+    private function closeStep(AssistantTurn $turn, StepOutcomeEnum $outcome, ?Closure $writes = null, array $attributes = [], bool $paused = false, bool $counts = true): StepOutcomeEnum
     {
-        return DB::transaction(function () use ($turn, $outcome, $writes, $attributes, $paused): StepOutcomeEnum {
+        return DB::transaction(function () use ($turn, $outcome, $writes, $attributes, $paused, $counts): StepOutcomeEnum {
             $this->assertClaimHeld($turn);
 
             if ($writes !== null) {
                 $writes();
             }
 
-            $iterations = $turn->iterations + 1;
+            $iterations = $turn->iterations + ($counts ? 1 : 0);
             $maxIterations = max(1, (int) AssistantNaming::config('max_iterations'));
 
-            if ($outcome === StepOutcomeEnum::Continue && $iterations >= $maxIterations + ($paused ? 1 : 0)) {
+            if ($counts && $outcome === StepOutcomeEnum::Continue && $iterations >= $maxIterations + ($paused ? 1 : 0)) {
                 $this->storeVisible($turn, AssistantMessageKindEnum::Text, $this->limitText($turn));
                 $outcome = StepOutcomeEnum::Completed;
             }
