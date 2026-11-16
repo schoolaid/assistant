@@ -19,6 +19,8 @@ use SchoolAid\Assistant\Models\AssistantConversation;
 use SchoolAid\Assistant\Models\AssistantMessage;
 use SchoolAid\Assistant\Models\AssistantTurn;
 use SchoolAid\Assistant\Services\Agent\AssistantTurnRunner;
+use SchoolAid\Assistant\Services\Agent\ConversationSummary;
+use SchoolAid\Assistant\Services\Agent\ConversationTranscript;
 use SchoolAid\Assistant\Services\Tools\ToolBridge;
 
 require_once __DIR__.'/TurnDoubles.php';
@@ -187,6 +189,50 @@ trait ScriptedTurn
 
             return $turn;
         });
+    }
+
+    /**
+     * A stored summary that worked: it replaces every message up to $throughMessageId.
+     */
+    public function summaryRow(AssistantConversation $conversation, AssistantTurn $turn, string $text, int $throughMessageId): AssistantMessage
+    {
+        return $this->inWorkspace(fn (): AssistantMessage => AssistantMessage::factory()->create([
+            'conversation_id' => $conversation->id, 'turn_id' => $turn->id, 'role' => 'user', 'kind' => 'summary',
+            'content' => [['type' => 'text', 'text' => ConversationSummary::HEADER.$text]],
+            'payload' => ['through_message_id' => $throughMessageId], 'display_text' => null,
+        ]));
+    }
+
+    /**
+     * A stored attempt that produced no summary.
+     */
+    public function failedSummaryRow(AssistantConversation $conversation, AssistantTurn $turn, string $reason = 'refusal'): AssistantMessage
+    {
+        return $this->inWorkspace(fn (): AssistantMessage => AssistantMessage::factory()->create([
+            'conversation_id' => $conversation->id, 'turn_id' => $turn->id, 'role' => 'user', 'kind' => 'summary',
+            'content' => [], 'payload' => ['failed' => true, 'reason' => $reason], 'display_text' => null,
+        ]));
+    }
+
+    public function lastMessageId(AssistantConversation $conversation): int
+    {
+        return (int) $this->inWorkspace(fn () => AssistantMessage::query()->where('conversation_id', $conversation->id)->max('id'));
+    }
+
+    /**
+     * The history as the engine would send it, as one JSON string to search in.
+     */
+    public function history(AssistantConversation $conversation, ?int $beforeMessageId = null): string
+    {
+        return json_encode($this->apiMessages($conversation, $beforeMessageId), JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * @return list<array{role: string, content: list<array<string, mixed>>}>
+     */
+    public function apiMessages(AssistantConversation $conversation, ?int $beforeMessageId = null): array
+    {
+        return $this->inWorkspace(fn (): array => app(ConversationTranscript::class)->toApiMessages($conversation, $beforeMessageId));
     }
 
     public function step(AssistantTurn $turn): StepOutcomeEnum

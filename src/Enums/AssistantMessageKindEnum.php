@@ -20,4 +20,9 @@ enum AssistantMessageKindEnum: string
     case File = 'file';
     case Error = 'error';
     case Internal = 'internal';
+    /**
+     * El resumen que reemplaza lo anterior de una conversación larga, o un intento que no lo logró
+     * ({@see \SchoolAid\Assistant\Services\Agent\ConversationSummary}). Lo lee el modelo; el panel nunca lo muestra.
+     */
+    case Summary = 'summary';
 }

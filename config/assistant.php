@@ -14,6 +14,20 @@ return [
     'max_conversation_input_tokens' => 150000,
 
     /*
+    | A conversation past this size (input tokens of its last request) is summarized when its next
+    | turn starts, instead of being closed at max_conversation_input_tokens. Null: never summarized.
+    | Switch it on in a later release than the one that brings the code: a version without the
+    | `summary` message kind cannot read a summarized conversation.
+    */
+    'summarize_at_input_tokens' => null,
+    'summary' => [
+        // Cap of the summary call; its thinking counts.
+        'max_tokens' => 8192,
+        // Replaces the engine's summary instructions (ConversationSummary::DEFAULT_INSTRUCTIONS).
+        'instructions' => null,
+    ],
+
+    /*
     | The Messages API. The platform key; a workspace may bring its own (AssistantApiKey).
     */
     'anthropic' => [

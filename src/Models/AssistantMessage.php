@@ -89,7 +89,8 @@ class AssistantMessage extends Model
     }
 
     /**
-     * Lo que el panel muestra: ni los mensajes `internal` (resultados de tools, avisos al agente) ni las respuestas del
+     * Lo que el panel muestra: ni los mensajes `internal` (resultados de tools, avisos al agente), ni los `summary` (el
+     * resumen de una conversación larga, que solo lee el modelo), ni las respuestas del
      * modelo sin texto (rondas que solo pidieron tools). El panel lee `display_text`, nunca `content`: un `error`
      * guarda ahí los bloques crudos de un rechazo.
      *
@@ -97,7 +98,7 @@ class AssistantMessage extends Model
      */
     public function scopeVisibleInPanel(Builder $query): void
     {
-        $query->where('kind', '!=', AssistantMessageKindEnum::Internal->value)
+        $query->whereNotIn('kind', [AssistantMessageKindEnum::Internal->value, AssistantMessageKindEnum::Summary->value])
             ->whereNot(fn (Builder $hidden) => $hidden
                 ->where('role', 'assistant')
                 ->where('kind', AssistantMessageKindEnum::Text->value)

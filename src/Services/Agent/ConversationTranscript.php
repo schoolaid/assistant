@@ -12,12 +12,17 @@ use stdClass;
  * La conversación guardada como `messages` de la Messages API, en cada paso.
  *
  * El historial solo se agrega: todos los mensajes, desde el primero y en orden, con `content` tal
- * como se guardó. Nada se recorta, resume ni reescribe, tampoco los bloques `thinking` /
+ * como se guardó. Nada se recorta ni reescribe, tampoco los bloques `thinking` /
  * `redacted_thinking` de turnos anteriores: su firma ata el razonamiento al `system`, las `tools` y
  * los mensajes previos, y si algo de eso cambió la API los descarta (`drop_block`, ver
  * {@see AssistantTurnRunner}). Así cada paso manda el prefijo exacto del anterior (caché y firmas).
- * El tope de tamaño lo pone el envío de mensajes (`assistant.max_conversation_input_tokens`): el
- * panel ofrece una conversación nueva.
+ *
+ * La única excepción es el resumen de una conversación larga ({@see ConversationSummary}): si la
+ * conversación tiene un `summary` logrado, el historial empieza en el más reciente y sigue con los
+ * mensajes posteriores al último que ese resumen reemplaza. De lo resumido no se reenvía nada, así
+ * que tampoco queda razonamiento viejo cuya firma ya no valga. Un intento fallido nunca va. Sin
+ * resumen, el tope de tamaño lo pone el envío de mensajes
+ * (`assistant.max_conversation_input_tokens`): el panel ofrece una conversación nueva.
  *
  * Qué no va:
  * - Los mensajes `confirmation`, `choices` y `error`: los escribió el backend para el panel, nunca
@@ -54,16 +59,29 @@ class ConversationTranscript
      */
     private const PANEL_ONLY_KINDS = [AssistantMessageKindEnum::Confirmation, AssistantMessageKindEnum::Choices, AssistantMessageKindEnum::Chart, AssistantMessageKindEnum::File, AssistantMessageKindEnum::Error];
 
+    public function __construct(private readonly ConversationSummary $summary)
+    {
+    }
+
     private const THINKING_TYPES = ['thinking', 'redacted_thinking'];
 
     /**
+     * Con `$beforeMessageId`, solo lo anterior a ese mensaje: es lo que se le manda al resumidor.
+     *
      * @return list<array{role: string, content: list<array<string, mixed>>}>
      */
-    public function toApiMessages(AssistantConversation $conversation): array
+    public function toApiMessages(AssistantConversation $conversation, ?int $beforeMessageId = null): array
     {
-        $stored = [];
+        $summary = $this->summary->latest($conversation, $beforeMessageId);
+        $stored = $summary === null ? [] : [['role' => $summary->role, 'content' => $this->storedBlocks($summary->content)]];
 
-        foreach ($this->sentToModel($conversation)->orderBy('id')->get() as $message) {
+        $messages = $this->sentToModel($conversation)
+            ->when($summary !== null, fn ($query) => $query->where('id', '>', ConversationSummary::throughMessageId($summary)))
+            ->when($beforeMessageId !== null, fn ($query) => $query->where('id', '<', $beforeMessageId))
+            ->orderBy('id')
+            ->get();
+
+        foreach ($messages as $message) {
             $stored[] = ['role' => $message->role, 'content' => $this->storedBlocks($message->content)];
         }
 
@@ -179,7 +197,7 @@ class ConversationTranscript
     {
         return $conversation->messages()->whereNotIn(
             'kind',
-            array_map(fn (AssistantMessageKindEnum $kind): string => $kind->value, self::PANEL_ONLY_KINDS),
+            array_map(fn (AssistantMessageKindEnum $kind): string => $kind->value, [...self::PANEL_ONLY_KINDS, AssistantMessageKindEnum::Summary]),
         );
     }
 
