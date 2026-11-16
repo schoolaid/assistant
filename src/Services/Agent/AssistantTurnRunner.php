@@ -122,11 +122,6 @@ class AssistantTurnRunner
      */
     private const MAX_STOP_REASON_CHARS = 32;
 
-    /**
-     * Tope de la llamada de resumen si la config de la app no trae `summary.max_tokens`.
-     */
-    private const SUMMARY_MAX_TOKENS = 8192;
-
     public function __construct(
         private readonly AnthropicMessagesClient $client,
         private readonly AssistantBudget $budget,
@@ -250,15 +245,12 @@ class AssistantTurnRunner
             ->max('id');
 
         $messages = $this->withSummaryRequest($this->transcript->toApiMessages($conversation, $firstOfTurn));
-        $payload = [
-            ...$this->payload($turn, $messages),
-            'max_tokens' => (int) (AssistantNaming::config('summary.max_tokens') ?: self::SUMMARY_MAX_TOKENS),
-        ];
+        $payload = [...$this->payload($turn, $messages), 'max_tokens' => $this->summary->maxTokens()];
 
         try {
             $response = $this->client->create($payload, self::BETAS);
         } catch (AnthropicRequestFailed $failure) {
-            if (! $failure->exceedsRequestLimits()) {
+            if ($failure->status !== 400 && ! $failure->exceedsRequestLimits()) {
                 throw $failure;
             }
 
@@ -284,9 +276,14 @@ class AssistantTurnRunner
 
     /**
      * El modelo no dejó un resumen (rechazo, corte por `max_tokens`, pidió una tool, respondió sin texto) o la API
-     * rechazó el pedido por su tamaño. El turno no se detiene: queda la marca del intento y el paso siguiente hace la
-     * llamada normal con el historial completo, como si no se resumiera. Si la respuesta pidió tools, no se ejecutan:
-     * esa respuesta no se guarda como mensaje.
+     * rechazó el pedido (un 400 cualquiera o un 413: repetirlo daría lo mismo, y el pedido normal que sigue todavía
+     * puede servir). El turno no se detiene: queda la marca del intento y el paso siguiente hace la llamada normal con
+     * el historial completo, como si no se resumiera. Si la respuesta pidió tools, no se ejecutan: esa respuesta no se
+     * guarda como mensaje.
+     *
+     * Un rechazo de los clasificadores solo va al log. Lo demás es cosa nuestra (un tope de salida corto, unas
+     * instrucciones que el modelo no sigue) y se reporta: bajo el tope de tamaño el resumen se reintenta y se paga
+     * en cada turno, y eso no puede quedar solo en un log.
      *
      * Cualquier otro fallo de la API (429, 5xx, sin conexión) no llega aquí: sube a {@see self::step()}, el turno
      * falla como cualquier llamada y no queda marca, así que el mensaje siguiente lo intenta de nuevo.
@@ -298,6 +295,10 @@ class AssistantTurnRunner
             'turn_id' => $turn->id,
             'reason' => $reason,
         ]);
+
+        if (! in_array($reason, ['refusal', 'rejected'], true)) {
+            report(new UnexpectedValueException("The summary of conversation {$turn->conversation_id} (turn {$turn->id}) ended with {$reason}."));
+        }
 
         return $this->closeStep(
             $turn,

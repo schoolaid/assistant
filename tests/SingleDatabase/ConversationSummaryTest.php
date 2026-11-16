@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
 use SchoolAid\Assistant\Enums\AssistantTurnStatusEnum;
@@ -309,6 +310,7 @@ it('stores nothing when the step claim was lost while the summary was being writ
     $this->onApiCall = fn () => $this->inWorkspace(fn () => AssistantTurn::query()->whereKey($turn->id)->update(['step_started_at' => now()->addMinute()]));
 
     expect($this->step($turn))->toBe(StepOutcomeEnum::Skipped)
+        ->and(json_encode($this->sentRequests()[0]['messages'], JSON_UNESCAPED_UNICODE))->toContain('Resume esta conversación')
         ->and($this->inWorkspace(fn (): bool => AssistantMessage::query()->where('kind', 'summary')->exists()))->toBeFalse();
 });
 
@@ -455,4 +457,129 @@ it('behaves as before with summaries off', function () {
     summarizeAt(1000);
 
     expect(closedBySize($conversation))->toBeFalse();
+});
+
+/*
+| Found by the review of the whole change, before the first release.
+*/
+
+it('treats any 400 on the summary request as a failed summary, not as a failed turn', function () {
+    summarizeAt(1000);
+    $conversation = $this->conversation();
+    $this->finishedTurn($conversation, '¿cuánto se vendió hoy?', 'Fueron Q 1,200.', promptTokens: 1200);
+    $this->scriptApi([
+        fn () => Http::response(['type' => 'error', 'error' => ['type' => 'invalid_request_error', 'message' => 'messages.3: unexpected block']], 400),
+        $this->textResponse('Ayer fueron Q 900.'),
+    ]);
+    $turn = $this->personTurn($conversation, 'y ayer');
+
+    expect($this->step($turn))->toBe(StepOutcomeEnum::Continue)
+        ->and(storedSummary($conversation)->payload)->toBe(['failed' => true, 'reason' => 'rejected'])
+        ->and($this->step($turn))->toBe(StepOutcomeEnum::Completed);
+});
+
+it('leaves no server tool call open in what it sends to the summarizer', function () {
+    summarizeAt(1000);
+    $conversation = $this->conversation();
+    $died = $this->personTurn($conversation, 'busca la tool de ventas', status: AssistantTurnStatusEnum::Failed);
+    $this->inWorkspace(fn () => AssistantMessage::factory()->create([
+        'conversation_id' => $conversation->id, 'turn_id' => $died->id, 'role' => 'assistant', 'kind' => 'text',
+        'content' => [
+            ['type' => 'text', 'text' => 'Busco la tool.'],
+            ['type' => 'server_tool_use', 'id' => 'srvtoolu_1', 'name' => 'tool_search_tool_bm25', 'input' => ['query' => 'ventas']],
+        ],
+        'display_text' => 'Busco la tool.', 'model' => 'claude-sonnet-5-5', 'stop_reason' => 'pause_turn', 'input_tokens' => 1200,
+    ]));
+    $this->scriptApi([$this->textResponse('Pidió buscar la tool de ventas.')]);
+
+    expect($this->step($this->personTurn($conversation, 'sigue')))->toBe(StepOutcomeEnum::Continue);
+
+    $asked = json_encode($this->sentRequests()[0]['messages'], JSON_UNESCAPED_UNICODE);
+
+    expect($asked)->toContain('Busco la tool.')
+        ->and($asked)->not->toContain('srvtoolu_1');
+});
+
+it('falls back to its own cap when summary.max_tokens is not a positive number', function (mixed $configured) {
+    summarizeAt(1000);
+    config([HostServiceProvider::NAME.'.summary.max_tokens' => $configured]);
+    $conversation = $this->conversation();
+    $this->finishedTurn($conversation, '¿cuánto se vendió hoy?', 'Fueron Q 1,200.', promptTokens: 1200);
+    $this->scriptApi([$this->textResponse('Vio las ventas de hoy.')]);
+
+    $this->step($this->personTurn($conversation, 'y ayer'));
+
+    expect($this->sentRequests()[0]['max_tokens'])->toBe(8192);
+})->with(['a word' => ['abc'], 'negative' => [-5], 'zero' => [0], 'unset' => [null]]);
+
+it('carries the context of the last message of the person into the next summary', function () {
+    summarizeAt(1000);
+    $conversation = $this->conversation();
+    $this->finishedTurn($conversation, '¿cuánto se vendió hoy?', 'Fueron Q 1,200.', promptTokens: 1200, turnContext: '[Momento] lunes, sucursal Norte.');
+    $this->scriptApi([
+        $this->textResponse('Primer resumen.'),
+        $this->textResponse('Te muestro la vista previa.', input: 1500),
+        $this->textResponse('Segundo resumen.'),
+    ]);
+    $second = $this->personTurn($conversation, 'anula la orden 5', turnContext: '[Momento] martes, sucursal Sur.');
+    $this->step($second);
+    $this->step($second);
+
+    expect($this->step($this->followUpTurn($conversation, 'La persona confirmó: orden 5 anulada.')))->toBe(StepOutcomeEnum::Continue);
+
+    $latest = $this->inWorkspace(fn (): AssistantMessage => app(ConversationSummary::class)->latest($conversation));
+
+    expect(array_column($latest->content, 'text'))->toBe([
+        FakeInstructions::CONVERSATION_CONTEXT,
+        '[Momento] martes, sucursal Sur.',
+        ConversationSummary::HEADER.'Segundo resumen.',
+    ]);
+});
+
+it('does not summarize the summary again when the turn that wrote it failed afterwards', function () {
+    Sleep::fake();
+    summarizeAt(1000);
+    $conversation = $this->conversation();
+    $this->finishedTurn($conversation, '¿cuánto se vendió hoy?', 'Fueron Q 1,200.', promptTokens: 1200);
+    $overloaded = fn () => Http::response(['type' => 'error', 'error' => ['type' => 'overloaded_error', 'message' => 'Overloaded']], 529);
+    $this->scriptApi([$this->textResponse('Vio las ventas de hoy.'), $overloaded, $overloaded, $this->textResponse('Ayer fueron Q 900.')]);
+    $failed = $this->personTurn($conversation, 'y ayer');
+
+    expect($this->step($failed))->toBe(StepOutcomeEnum::Continue)
+        ->and($this->step($failed))->toBe(StepOutcomeEnum::Failed);
+
+    $retry = $this->personTurn($conversation, 'y ayer');
+
+    expect($this->inWorkspace(fn (): bool => app(ConversationSummary::class)->due($retry)))->toBeFalse()
+        ->and($this->step($retry))->toBe(StepOutcomeEnum::Completed)
+        ->and($this->inWorkspace(fn (): int => AssistantMessage::query()->where('kind', 'summary')->count()))->toBe(1);
+});
+
+it('reports a summary that failed for a reason of ours, and only logs a refusal', function (string $stopReason, bool $reported) {
+    Exceptions::fake();
+    summarizeAt(1000);
+    $conversation = $this->conversation();
+    $this->finishedTurn($conversation, '¿cuánto se vendió hoy?', 'Fueron Q 1,200.', promptTokens: 1200);
+    $this->scriptApi([$this->apiResponse([], $stopReason)]);
+
+    $this->step($this->personTurn($conversation, 'y ayer'));
+
+    $reported ? Exceptions::assertReported(UnexpectedValueException::class) : Exceptions::assertNothingReported();
+})->with(['cut off by its own cap' => ['max_tokens', true], 'no text' => ['end_turn', true], 'a refusal' => ['refusal', false]]);
+
+it('adds the request for the summary to a history that already ends with the person', function () {
+    summarizeAt(1000);
+    $conversation = $this->conversation();
+    $this->finishedTurn($conversation, '¿cuánto se vendió hoy?', 'Fueron Q 1,200.', promptTokens: 1200);
+    $this->personTurn($conversation, 'y la semana pasada', status: AssistantTurnStatusEnum::Failed);
+    $this->scriptApi([$this->textResponse('Vio las ventas de hoy y pidió la semana pasada.')]);
+
+    expect($this->step($this->personTurn($conversation, 'y ayer')))->toBe(StepOutcomeEnum::Continue);
+
+    $messages = $this->sentRequests()[0]['messages'];
+    $last = end($messages);
+
+    expect(array_column($messages, 'role'))->toBe(['user', 'assistant', 'user'])
+        ->and(json_encode($last['content'], JSON_UNESCAPED_UNICODE))->toContain('y la semana pasada')
+        ->and(end($last['content'])['text'])->toBe(ConversationSummary::DEFAULT_INSTRUCTIONS);
 });

@@ -50,6 +50,11 @@ final class ConversationSummary
         TEXT;
 
     /**
+     * Tope de la llamada de resumen cuando la config no trae uno que sirva.
+     */
+    public const DEFAULT_MAX_TOKENS = 8192;
+
+    /**
      * El tamaño desde el que se resume, o null si está apagado.
      */
     public function threshold(): ?int
@@ -94,7 +99,28 @@ final class ConversationSummary
             ->whereNotNull('model')
             ->exists();
 
-        return ! $answered && $this->promptTokens((int) $turn->conversation_id) >= $threshold;
+        if ($answered || $this->summarizedSinceLastResponse((int) $turn->conversation_id)) {
+            return false;
+        }
+
+        return $this->promptTokens((int) $turn->conversation_id) >= $threshold;
+    }
+
+    /**
+     * La conversación ya se resumió después de su última respuesta de la API: el turno que escribió el resumen falló
+     * antes de responder. El tamaño que {@see self::promptTokens()} mide es todavía el de antes del resumen, así que
+     * sin esto el turno siguiente resumiría el resumen.
+     */
+    private function summarizedSinceLastResponse(int $conversationId): bool
+    {
+        $conversation = AssistantMessage::query()->where('conversation_id', $conversationId);
+        $lastResponseId = (int) (clone $conversation)->where('role', 'assistant')->whereNotNull('model')->max('id');
+
+        return (clone $conversation)
+            ->where('kind', AssistantMessageKindEnum::Summary->value)
+            ->where('id', '>', $lastResponseId)
+            ->get()
+            ->contains(fn (AssistantMessage $summary): bool => self::throughMessageId($summary) !== null);
     }
 
     /**
@@ -148,6 +174,17 @@ final class ConversationSummary
         }
 
         return $failed;
+    }
+
+    /**
+     * `assistant.summary.max_tokens`, o {@see self::DEFAULT_MAX_TOKENS} si no es un número positivo: con un valor
+     * que la API rechaza, toda conversación sobre el umbral fallaría en cada turno.
+     */
+    public function maxTokens(): int
+    {
+        $value = AssistantNaming::config('summary.max_tokens');
+
+        return is_numeric($value) && (int) $value > 0 ? (int) $value : self::DEFAULT_MAX_TOKENS;
     }
 
     public function instructions(): string
@@ -252,7 +289,7 @@ final class ConversationSummary
         $lastFromPerson = (clone $messages)
             ->where('role', 'user')
             ->where('kind', AssistantMessageKindEnum::Text->value)
-            ->when($previous !== null, fn ($query) => $query->where('id', '>', $previous->getKey()))
+            ->when($previous !== null, fn ($query) => $query->where('id', '>', self::throughMessageId($previous)))
             ->orderByDesc('id')
             ->first();
 

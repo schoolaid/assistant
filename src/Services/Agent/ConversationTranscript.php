@@ -85,7 +85,7 @@ class ConversationTranscript
             $stored[] = ['role' => $message->role, 'content' => $this->storedBlocks($message->content)];
         }
 
-        $messages = $this->mergeNeighbours($this->withoutClosedServerToolUses($this->mergeNeighbours($stored)));
+        $messages = $this->mergeNeighbours($this->withoutClosedServerToolUses($this->mergeNeighbours($stored), $beforeMessageId === null));
 
         return $this->answerDanglingToolUses($messages);
     }
@@ -119,12 +119,14 @@ class ConversationTranscript
 
     /**
      * Quita los `server_tool_use` que nunca tuvieron resultado (ningún bloque posterior lo nombra
-     * en `tool_use_id`) salvo donde siguen abiertos (ver la doc de la clase).
+     * en `tool_use_id`) salvo donde siguen abiertos (ver la doc de la clase). Con `$mayBeOpen` en
+     * false ninguno sigue abierto: es un historial cortado para el resumidor, que lleva detrás las
+     * instrucciones de resumen y no un turno que la API vaya a retomar.
      *
      * @param  list<array{role: string, content: list<array<string, mixed>>}>  $messages
      * @return list<array{role: string, content: list<array<string, mixed>>}>
      */
-    private function withoutClosedServerToolUses(array $messages): array
+    private function withoutClosedServerToolUses(array $messages, bool $mayBeOpen = true): array
     {
         $resolved = [];
 
@@ -137,7 +139,7 @@ class ConversationTranscript
         }
 
         foreach ($messages as $index => $message) {
-            if ($message['role'] !== 'assistant' || $this->isOpenServerTurn($messages, $index)) {
+            if ($message['role'] !== 'assistant' || ($mayBeOpen && $this->isOpenServerTurn($messages, $index))) {
                 continue;
             }
 

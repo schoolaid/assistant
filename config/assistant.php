@@ -17,7 +17,9 @@ return [
     | A conversation past this size (input tokens of its last request) is summarized when its next
     | turn starts, instead of being closed at max_conversation_input_tokens. Null: never summarized.
     | Switch it on in a later release than the one that brings the code: a version without the
-    | `summary` message kind cannot read a summarized conversation.
+    | `summary` message kind cannot read a summarized conversation. Keep it below
+    | max_conversation_input_tokens: above it nothing is ever summarized and the cap does not close
+    | either, since it waits for a summary attempt.
     */
     'summarize_at_input_tokens' => null,
     'summary' => [

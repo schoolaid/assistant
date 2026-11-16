@@ -145,11 +145,11 @@ trait ScriptedTurn
      * A turn that already ended: what the person asked and the answer of the model, whose request
      * measured $promptTokens.
      */
-    public function finishedTurn(AssistantConversation $conversation, string $ask, string $answer, int $promptTokens): AssistantTurn
+    public function finishedTurn(AssistantConversation $conversation, string $ask, string $answer, int $promptTokens, string $turnContext = FakeInstructions::TURN_CONTEXT): AssistantTurn
     {
-        return $this->inWorkspace(function () use ($conversation, $ask, $answer, $promptTokens): AssistantTurn {
+        return $this->inWorkspace(function () use ($conversation, $ask, $answer, $promptTokens, $turnContext): AssistantTurn {
             $turn = $this->turn($conversation, AssistantTurnStatusEnum::Completed);
-            $this->personMessage($conversation, $turn, $ask);
+            $this->personMessage($conversation, $turn, $ask, $turnContext);
 
             AssistantMessage::factory()->create([
                 'conversation_id' => $conversation->id, 'turn_id' => $turn->id, 'role' => 'assistant', 'kind' => AssistantMessageKindEnum::Text,
@@ -164,11 +164,11 @@ trait ScriptedTurn
     /**
      * A queued turn opened by a message of the person.
      */
-    public function personTurn(AssistantConversation $conversation, string $text): AssistantTurn
+    public function personTurn(AssistantConversation $conversation, string $text, string $turnContext = FakeInstructions::TURN_CONTEXT, AssistantTurnStatusEnum $status = AssistantTurnStatusEnum::Queued): AssistantTurn
     {
-        return $this->inWorkspace(function () use ($conversation, $text): AssistantTurn {
-            $turn = $this->turn($conversation, AssistantTurnStatusEnum::Queued);
-            $this->personMessage($conversation, $turn, $text);
+        return $this->inWorkspace(function () use ($conversation, $text, $turnContext, $status): AssistantTurn {
+            $turn = $this->turn($conversation, $status);
+            $this->personMessage($conversation, $turn, $text, $turnContext);
 
             return $turn;
         });
@@ -256,7 +256,7 @@ trait ScriptedTurn
         ]);
     }
 
-    private function personMessage(AssistantConversation $conversation, AssistantTurn $turn, string $text): AssistantMessage
+    private function personMessage(AssistantConversation $conversation, AssistantTurn $turn, string $text, string $turnContext = FakeInstructions::TURN_CONTEXT): AssistantMessage
     {
         $opens = ! AssistantMessage::query()->where('conversation_id', $conversation->id)->exists();
 
@@ -264,7 +264,7 @@ trait ScriptedTurn
             'conversation_id' => $conversation->id, 'turn_id' => $turn->id, 'role' => 'user', 'kind' => AssistantMessageKindEnum::Text,
             'content' => array_map(fn (string $block): array => ['type' => 'text', 'text' => $block], [
                 ...($opens ? [FakeInstructions::CONVERSATION_CONTEXT] : []),
-                FakeInstructions::TURN_CONTEXT,
+                $turnContext,
                 $text,
             ]),
             'display_text' => $text,
