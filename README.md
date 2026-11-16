@@ -103,6 +103,25 @@ Then, in the app:
 the migrations and checks that rows do not cross between workspaces, and that config,
 translations, routes and the limiter follow the name.
 
+### Long conversations
+
+A conversation is closed when its last request reached `max_conversation_input_tokens`. Set
+`summarize_at_input_tokens` (null by default: off) and a conversation past that size is summarized
+when its next turn starts instead: the engine asks the model for the summary itself, stores it as
+a `summary` message that the panel never lists, and builds the history from the latest one.
+
+- `summary.max_tokens` caps the summary call; `summary.instructions` replaces the engine's
+  instructions (`ConversationSummary::DEFAULT_INSTRUCTIONS`).
+- No migration: `kind` is a string column.
+- **Switch it on in a later release than the one that brings this version.** A version without the
+  `summary` kind cannot read a summarized conversation, so no image older than this version may be
+  left to roll back to.
+- A summary that fails never stops the turn; with summaries on, the size cap closes a conversation
+  only after a failed attempt.
+
+`tests/SingleDatabase/ConversationSummaryTest.php` runs whole turns against a scripted Messages
+API (`tests/Fixtures/ScriptedTurn.php`).
+
 ## Not done yet
 
 - MarketAid does not require the package: it keeps its own copy of the engine, config,
