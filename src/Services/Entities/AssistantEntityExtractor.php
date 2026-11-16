@@ -15,8 +15,13 @@ use Illuminate\Database\Eloquent\Builder;
  * guardados (como {@see \SchoolAid\Assistant\Support\AssistantTurnSteps}) y de las confirmaciones.
  *
  * Qué argumento o clave del resultado de cada tool es un registro lo dice `AssistantNaming::config('entities')`: por tool, una
- * lista de `{type, id, model_key?, date?}` con rutas `input.<arg>` (los argumentos de la llamada) o `result.<clave>`
- * (lo que devolvió la escritura al confirmarse; un registro por esa ruta es uno que la escritura creó).
+ * lista de `{type, id, model_key?, date?}` con rutas `input.<arg>` (los argumentos de la llamada), `output.<clave>` (lo
+ * que respondió la tool en el chat, si fue JSON) o `result.<clave>` (lo que devolvió la escritura al confirmarse; un
+ * registro por esa ruta es uno que la escritura creó).
+ *
+ * Una ruta con `*` (`output.data.*.id`) da registro solo si encuentra exactamente un valor: una búsqueda o un listado
+ * que halló un solo registro cuenta, uno de varios no llena el panel. De una escritura, `output` es su vista previa:
+ * lo que crea se mapea con `result.`.
  */
 final class AssistantEntityExtractor
 {
@@ -27,11 +32,13 @@ final class AssistantEntityExtractor
 
     private const RESULT_PATH = 'result.';
 
+    private const WILDCARD = '*';
+
     /**
      * Los registros de las llamadas que terminaron bien (con `tool_result` sin `is_error`; una sin respuesta o con
      * error no cuenta) y de las confirmaciones `confirmed`, en el orden en que aparecieron, sin repetir y hasta
-     * {@see self::MAX_ENTITIES}. De una llamada solo cuentan sus argumentos: lo que devuelve una escritura en el chat es
-     * su vista previa, y su resultado llega con la confirmación.
+     * {@see self::MAX_ENTITIES}. De una llamada cuentan sus argumentos y lo que respondió (`output`); lo que crea una
+     * escritura llega con la confirmación (`result`).
      *
      * @return list<AssistantEntityRef>
      */
@@ -62,7 +69,7 @@ final class AssistantEntityExtractor
                 }
 
                 if ($message->role === 'user' && ($block['type'] ?? null) === 'tool_result' && ! ($block['is_error'] ?? false)) {
-                    $answered[(string) ($block['tool_use_id'] ?? '')] = true;
+                    $answered[(string) ($block['tool_use_id'] ?? '')] = $this->output($block['content'] ?? null);
                 }
             }
         }
@@ -70,8 +77,11 @@ final class AssistantEntityExtractor
         $sources = [];
 
         foreach ($calls as $toolUseId => $call) {
-            if (isset($answered[$toolUseId])) {
-                $sources[] = ['position' => $call['position'], 'refs' => $this->refs($call['tool'], ['input' => $call['input']])];
+            if (array_key_exists($toolUseId, $answered)) {
+                $sources[] = [
+                    'position' => $call['position'],
+                    'refs' => $this->refs($call['tool'], ['input' => $call['input'], 'output' => $answered[$toolUseId]]),
+                ];
             }
         }
 
@@ -111,7 +121,7 @@ final class AssistantEntityExtractor
      * Un registro por cada entrada de la tool en el mapa cuyo id se encuentre en la llamada (un argumento opcional que
      * no vino, o el resultado de una llamada que todavía no lo tiene, no da registro).
      *
-     * @param  array{input: array<string, mixed>, result?: array<string, mixed>}  $call
+     * @param  array{input: array<string, mixed>, output?: array<mixed>|null, result?: array<string, mixed>}  $call
      * @return list<AssistantEntityRef>
      */
     private function refs(string $tool, array $call): array
@@ -119,9 +129,9 @@ final class AssistantEntityExtractor
         $refs = [];
 
         foreach ((array) (AssistantNaming::config('entities', [])[$tool] ?? []) as $mapping) {
-            $id = $this->id(data_get($call, $mapping['id']));
-            $modelKey = isset($mapping['model_key']) ? data_get($call, $mapping['model_key']) : null;
-            $date = isset($mapping['date']) ? data_get($call, $mapping['date']) : null;
+            $id = $this->id($this->value($call, $mapping['id']));
+            $modelKey = isset($mapping['model_key']) ? $this->value($call, $mapping['model_key']) : null;
+            $date = isset($mapping['date']) ? $this->value($call, $mapping['date']) : null;
 
             if ($id === null || (isset($mapping['model_key']) && ! is_string($modelKey))) {
                 continue;
@@ -137,6 +147,41 @@ final class AssistantEntityExtractor
         }
 
         return $refs;
+    }
+
+    /**
+     * El valor de la ruta en la llamada; con `*`, el único que encuentre (ninguno o varios: null).
+     *
+     * @param  array<string, mixed>  $call
+     */
+    private function value(array $call, string $path): mixed
+    {
+        if (! str_contains($path, self::WILDCARD)) {
+            return data_get($call, $path);
+        }
+
+        $found = data_get($call, $path);
+
+        return is_array($found) && count($found) === 1 ? reset($found) : null;
+    }
+
+    /**
+     * Lo que respondió la tool, si es JSON: texto (como lo guarda el turno) o bloques de texto. Otra cosa, null.
+     *
+     * @return array<mixed>|null
+     */
+    private function output(mixed $content): ?array
+    {
+        if (is_array($content)) {
+            $content = implode('', array_map(
+                fn (mixed $block): string => is_array($block) && ($block['type'] ?? null) === 'text' ? (string) ($block['text'] ?? '') : '',
+                $content,
+            ));
+        }
+
+        $decoded = is_string($content) ? json_decode($content, true) : null;
+
+        return is_array($decoded) ? $decoded : null;
     }
 
     private function id(mixed $value): ?int

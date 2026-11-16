@@ -135,7 +135,11 @@ return [
     'suggestions_limit' => 4,
 
     /*
-    | Which records each tool touches, to label them in the panel (AssistantEntityExtractor).
+    | Which records each tool touches, to label them in the panel (AssistantEntityExtractor): per
+    | tool, a list of {type, id, model_key?, date?} with paths `input.<arg>` (the call's arguments),
+    | `output.<key>` (what the tool answered in the chat, when JSON) or `result.<key>` (what a
+    | confirmed write returned: a record created). A path with `*` (`output.data.*.id`) gives a
+    | record only when it finds exactly one value: a list or search that found a single record.
     */
     'entities' => [],
 
