@@ -31,6 +31,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 use UnexpectedValueException;
@@ -254,7 +255,18 @@ class AssistantTurnRunner
             'max_tokens' => (int) (AssistantNaming::config('summary.max_tokens') ?: self::SUMMARY_MAX_TOKENS),
         ];
 
-        $response = $this->client->create($payload, self::BETAS);
+        try {
+            $response = $this->client->create($payload, self::BETAS);
+        } catch (AnthropicRequestFailed $failure) {
+            if (! $failure->exceedsRequestLimits()) {
+                throw $failure;
+            }
+
+            report($failure);
+
+            return $this->summaryFailed($turn, 'rejected');
+        }
+
         $this->budget->record($response, (int) ($turn->panel_context['user_id'] ?? 0) ?: null);
         $summary = trim($response->text());
 
@@ -267,7 +279,32 @@ class AssistantTurnRunner
             );
         }
 
-        return $this->unexpectedStop($turn, $response);
+        return $this->summaryFailed($turn, $response->stopReason === 'end_turn' ? 'empty' : $response->stopReason, $response);
+    }
+
+    /**
+     * El modelo no dejó un resumen (rechazo, corte por `max_tokens`, pidió una tool, respondió sin texto) o la API
+     * rechazó el pedido por su tamaño. El turno no se detiene: queda la marca del intento y el paso siguiente hace la
+     * llamada normal con el historial completo, como si no se resumiera. Si la respuesta pidió tools, no se ejecutan:
+     * esa respuesta no se guarda como mensaje.
+     *
+     * Cualquier otro fallo de la API (429, 5xx, sin conexión) no llega aquí: sube a {@see self::step()}, el turno
+     * falla como cualquier llamada y no queda marca, así que el mensaje siguiente lo intenta de nuevo.
+     */
+    private function summaryFailed(AssistantTurn $turn, string $reason, ?AnthropicResponse $response = null): StepOutcomeEnum
+    {
+        Log::warning('Assistant could not summarize a conversation; the turn goes on with the whole history.', [
+            'conversation_id' => $turn->conversation_id,
+            'turn_id' => $turn->id,
+            'reason' => $reason,
+        ]);
+
+        return $this->closeStep(
+            $turn,
+            StepOutcomeEnum::Continue,
+            fn () => $this->summary->storeFailed($turn, Str::limit($reason, self::MAX_STOP_REASON_CHARS, ''), $response),
+            counts: false,
+        );
     }
 
     /**

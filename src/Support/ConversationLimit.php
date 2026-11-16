@@ -5,20 +5,23 @@ namespace SchoolAid\Assistant\Support;
 use SchoolAid\Assistant\Enums\AssistantTurnStatusEnum;
 use SchoolAid\Assistant\Models\AssistantMessage;
 use SchoolAid\Assistant\Models\AssistantTurn;
+use SchoolAid\Assistant\Services\Agent\ConversationSummary;
 
 /**
- * Cuándo una conversación ya no admite otro turno. El historial que va a la API solo se agrega y no se recorta, así
- * que el panel ofrece una conversación nueva:
+ * Cuándo una conversación ya no admite otro turno: el panel ofrece una conversación nueva.
  *
- * - la última respuesta de la API llegó a `assistant.max_conversation_input_tokens` sumando la entrada y la caché (es
- *   lo que mide la siguiente llamada), o
- * - el último turno murió porque la API rechazó el pedido con un 400 o un 413: su `error` empieza con
+ * - La última respuesta de la API llegó a `assistant.max_conversation_input_tokens` sumando la entrada y la caché (es
+ *   lo que mide la siguiente llamada). **Con el resumen encendido** (`assistant.summarize_at_input_tokens`,
+ *   {@see ConversationSummary}) eso solo cierra la conversación si además su último intento de resumen falló: una
+ *   conversación sobre el tope que todavía no lo intentó no está cerrada, porque su turno siguiente resume primero.
+ *   Con el resumen apagado el historial nunca se recorta y el tope cierra por sí solo.
+ * - El último turno murió porque la API rechazó el pedido con un 400 o un 413: su `error` empieza con
  *   {@see self::DEAD_END_ERROR_PREFIX} y repetir el mismo historial daría lo mismo.
  *
  * Es la única regla detrás del 409 `assistant_conversation_too_long`: la usan el envío de mensajes, Confirmar /
  * Rechazar una vista previa (antes de reclamar la confirmación: decidirla abriría un turno que la API no aceptaría; un
- * deshacer se decide sin turno de seguimiento) y el `closed` de la conversación en el panel. {@see self::reached()} es {@see self::reachedEach()} con una sola conversación: el listado
- * resuelve su página entera con las mismas dos consultas.
+ * deshacer se decide sin turno de seguimiento) y el `closed` de la conversación en el panel. {@see self::reached()} es
+ * {@see self::reachedEach()} con una sola conversación: el listado resuelve su página entera con las mismas consultas.
  */
 class ConversationLimit
 {
@@ -32,13 +35,17 @@ class ConversationLimit
      */
     public const MESSAGE = 'Esta conversación ya no se puede continuar; empieza una nueva.';
 
+    public function __construct(private readonly ConversationSummary $summary)
+    {
+    }
+
     public function reached(int $conversationId): bool
     {
         return $this->reachedEach([$conversationId])[$conversationId];
     }
 
     /**
-     * Si cada conversación llegó a su fin, con dos consultas para todas.
+     * Si cada conversación llegó a su fin, con las mismas consultas para todas.
      *
      * @param  list<int>  $conversationIds
      * @return array<int, bool> por id de conversación
@@ -53,11 +60,14 @@ class ConversationLimit
 
         $lastResponses = $this->lastResponses($conversationIds);
         $lastTurns = $this->lastTurns($conversationIds);
+        $summaryFailed = $this->summary->threshold() === null ? null : $this->summary->lastAttemptFailedEach($conversationIds);
         $reached = [];
 
         foreach ($conversationIds as $conversationId) {
-            $reached[$conversationId] = $this->isTooLong($lastResponses[$conversationId] ?? null)
-                || $this->wasRejectedByApi($lastTurns[$conversationId] ?? null);
+            $tooLong = $this->isTooLong($lastResponses[$conversationId] ?? null)
+                && ($summaryFailed === null || $summaryFailed[$conversationId]);
+
+            $reached[$conversationId] = $tooLong || $this->wasRejectedByApi($lastTurns[$conversationId] ?? null);
         }
 
         return $reached;

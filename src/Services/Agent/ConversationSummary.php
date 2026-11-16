@@ -197,6 +197,29 @@ final class ConversationSummary
     }
 
     /**
+     * Deja dicho que este turno intentó resumir y no lo logró: sin `content` (nunca va al modelo) y con el motivo. Con
+     * esta fila el turno no lo intenta otra vez, y {@see \SchoolAid\Assistant\Support\ConversationLimit} sabe que
+     * una conversación sobre el tope ya no se pudo resumir.
+     */
+    public function storeFailed(AssistantTurn $turn, string $reason, ?AnthropicResponse $response = null): AssistantMessage
+    {
+        return AssistantMessage::query()->create([
+            'conversation_id' => $turn->conversation_id,
+            'turn_id' => $turn->getKey(),
+            'role' => 'user',
+            'kind' => AssistantMessageKindEnum::Summary,
+            'content' => [],
+            'payload' => ['failed' => true, 'reason' => $reason],
+            'display_text' => null,
+            'model' => null,
+            'input_tokens' => $response?->inputTokens ?? 0,
+            'output_tokens' => $response?->outputTokens ?? 0,
+            'cache_read_tokens' => $response?->cacheReadTokens ?? 0,
+            'cache_write_tokens' => $response?->cacheWriteTokens ?? 0,
+        ]);
+    }
+
+    /**
      * Los bloques de contexto que el resumen lleva delante, de lo guardado hasta `$throughMessageId`.
      *
      * El envío de un mensaje guarda sus bloques como [contexto de la conversación (solo en el primero), contexto del

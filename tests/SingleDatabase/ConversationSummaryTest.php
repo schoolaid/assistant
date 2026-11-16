@@ -1,10 +1,14 @@
 <?php
 
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
+use SchoolAid\Assistant\Enums\AssistantTurnStatusEnum;
 use SchoolAid\Assistant\Enums\StepOutcomeEnum;
 use SchoolAid\Assistant\Models\AssistantMessage;
 use SchoolAid\Assistant\Models\AssistantTurn;
 use SchoolAid\Assistant\Models\AssistantUsage;
 use SchoolAid\Assistant\Services\Agent\ConversationSummary;
+use SchoolAid\Assistant\Support\ConversationLimit;
 use SchoolAid\Assistant\Tests\Fixtures\FakeInstructions;
 use SchoolAid\Assistant\Tests\Fixtures\HostServiceProvider;
 use SchoolAid\Assistant\Tests\Fixtures\ScriptedTurn;
@@ -306,4 +310,149 @@ it('stores nothing when the step claim was lost while the summary was being writ
 
     expect($this->step($turn))->toBe(StepOutcomeEnum::Skipped)
         ->and($this->inWorkspace(fn (): bool => AssistantMessage::query()->where('kind', 'summary')->exists()))->toBeFalse();
+});
+
+/**
+ * Whether the conversation is closed for a new message, Confirm or Reject.
+ */
+function closedBySize($conversation): bool
+{
+    return test()->inWorkspace(fn (): bool => app(ConversationLimit::class)->reached($conversation->id));
+}
+
+function sizeCapAt(int $tokens): void
+{
+    config([HostServiceProvider::NAME.'.max_conversation_input_tokens' => $tokens]);
+}
+
+it('keeps going on the full history when the summary fails', function (array $content, string $stopReason, string $reason) {
+    summarizeAt(1000);
+    $conversation = $this->conversation();
+    $this->finishedTurn($conversation, '¿cuánto se vendió hoy?', 'Fueron Q 1,200.', promptTokens: 1200);
+    $this->scriptApi([$this->apiResponse($content, $stopReason, input: 1200, output: 40), $this->textResponse('Ayer fueron Q 900.')]);
+
+    $turn = $this->personTurn($conversation, 'y ayer');
+
+    expect($this->step($turn))->toBe(StepOutcomeEnum::Continue)
+        ->and($this->step($turn))->toBe(StepOutcomeEnum::Completed)
+        ->and($this->sentRequests())->toHaveCount(2);
+
+    $sent = json_encode($this->sentRequests()[1]['messages'], JSON_UNESCAPED_UNICODE);
+    $attempt = storedSummary($conversation);
+
+    expect($sent)->toContain('¿cuánto se vendió hoy?')
+        ->and($sent)->toContain('Fueron Q 1,200.')
+        ->and($sent)->toContain('y ayer')
+        ->and($sent)->not->toContain('Resume esta conversación')
+        ->and($attempt->content)->toBe([])
+        ->and($attempt->payload)->toBe(['failed' => true, 'reason' => $reason])
+        ->and($attempt->model)->toBeNull()
+        ->and($attempt->input_tokens)->toBe(1200)
+        ->and($this->bridge->calls)->toBe([])
+        ->and($this->inWorkspace(fn () => AssistantTurn::query()->find($turn->id)->status))->toBe(AssistantTurnStatusEnum::Completed)
+        ->and($this->inWorkspace(fn () => AssistantTurn::query()->find($turn->id)->iterations))->toBe(1);
+})->with([
+    'a refusal' => [[], 'refusal', 'refusal'],
+    'a summary cut off' => [[['type' => 'text', 'text' => 'Vio las ven']], 'max_tokens', 'max_tokens'],
+    'a tool call instead of a summary' => [[['type' => 'tool_use', 'id' => 'toolu_1', 'name' => 'list-sales', 'input' => ['day' => 'today']]], 'tool_use', 'tool_use'],
+    'only whitespace' => [[['type' => 'text', 'text' => "  \n"]], 'end_turn', 'empty'],
+    'only thinking' => [[['type' => 'thinking', 'thinking' => '', 'signature' => 'sig']], 'end_turn', 'empty'],
+]);
+
+it('keeps going when the API rejects the summary request for its size', function () {
+    summarizeAt(1000);
+    $conversation = $this->conversation();
+    $this->finishedTurn($conversation, '¿cuánto se vendió hoy?', 'Fueron Q 1,200.', promptTokens: 1200);
+    $this->scriptApi([
+        fn () => Http::response(['type' => 'error', 'error' => ['type' => 'request_too_large', 'message' => 'Request exceeds the maximum size']], 413),
+        $this->textResponse('Ayer fueron Q 900.'),
+    ]);
+    $turn = $this->personTurn($conversation, 'y ayer');
+
+    expect($this->step($turn))->toBe(StepOutcomeEnum::Continue)
+        ->and(storedSummary($conversation)->payload)->toBe(['failed' => true, 'reason' => 'rejected'])
+        ->and($this->step($turn))->toBe(StepOutcomeEnum::Completed);
+});
+
+it('fails the turn like any API failure on a transient error, leaving no summary attempt', function () {
+    Sleep::fake();
+    summarizeAt(1000);
+    sizeCapAt(1100);
+    $conversation = $this->conversation();
+    $this->finishedTurn($conversation, '¿cuánto se vendió hoy?', 'Fueron Q 1,200.', promptTokens: 1200);
+    $overloaded = fn () => Http::response(['type' => 'error', 'error' => ['type' => 'overloaded_error', 'message' => 'Overloaded']], 529);
+    $this->scriptApi([$overloaded, $overloaded]);
+
+    $turn = $this->personTurn($conversation, 'y ayer');
+
+    expect($this->step($turn))->toBe(StepOutcomeEnum::Failed)
+        ->and($this->inWorkspace(fn (): bool => AssistantMessage::query()->where('kind', 'summary')->exists()))->toBeFalse()
+        ->and(closedBySize($conversation))->toBeFalse();
+
+    $retry = $this->personTurn($conversation, 'y ayer');
+
+    expect($this->inWorkspace(fn (): bool => app(ConversationSummary::class)->due($retry)))->toBeTrue();
+});
+
+it('closes an over-the-cap conversation only after a failed attempt', function () {
+    summarizeAt(1000);
+    sizeCapAt(2000);
+    $conversation = $this->conversation();
+    $this->finishedTurn($conversation, '¿cuánto se vendió hoy?', 'Fueron Q 1,200.', promptTokens: 2500);
+
+    expect(closedBySize($conversation))->toBeFalse();
+
+    $this->scriptApi([$this->apiResponse([], 'refusal'), $this->textResponse('Ayer fueron Q 900.', input: 2600)]);
+    $turn = $this->personTurn($conversation, 'y ayer');
+    $this->step($turn);
+    $this->step($turn);
+
+    expect(closedBySize($conversation))->toBeTrue();
+});
+
+it('lets a turn opened by Confirm over the cap run and get its answer even if the summary fails', function () {
+    summarizeAt(1000);
+    sizeCapAt(2000);
+    $conversation = $this->conversation();
+    $this->finishedTurn($conversation, 'anula la orden 5', 'Te muestro la vista previa.', promptTokens: 2500);
+    $this->scriptApi([$this->apiResponse([], 'refusal'), $this->textResponse('La orden 5 quedó anulada.', input: 2600)]);
+
+    expect(closedBySize($conversation))->toBeFalse();
+
+    $turn = $this->followUpTurn($conversation, 'La persona confirmó: orden 5 anulada.');
+
+    expect($this->step($turn))->toBe(StepOutcomeEnum::Continue)
+        ->and($this->step($turn))->toBe(StepOutcomeEnum::Completed)
+        ->and($this->inWorkspace(fn () => AssistantMessage::query()->where('turn_id', $turn->id)->where('role', 'assistant')->value('display_text')))
+        ->toBe('La orden 5 quedó anulada.');
+});
+
+// Review Focus 3
+it('looks only at the latest attempt for the cap, and at the latest success for the history', function () {
+    summarizeAt(1000);
+    sizeCapAt(2000);
+    $conversation = $this->conversation();
+    $first = $this->finishedTurn($conversation, '¿cuánto se vendió hoy?', 'Fueron Q 1,200.', promptTokens: 1200);
+    $this->failedSummaryRow($conversation, $first);
+    $second = $this->finishedTurn($conversation, 'y ayer', 'Ayer fueron Q 900.', promptTokens: 2500);
+
+    expect(closedBySize($conversation))->toBeTrue();
+
+    $this->summaryRow($conversation, $second, 'Comparó hoy con ayer.', $this->lastMessageId($conversation));
+
+    expect(closedBySize($conversation))->toBeFalse()
+        ->and($this->history($conversation))->toContain('Comparó hoy con ayer.')
+        ->and($this->history($conversation))->not->toContain('Ayer fueron Q 900.');
+});
+
+it('behaves as before with summaries off', function () {
+    sizeCapAt(2000);
+    $conversation = $this->conversation();
+    $this->finishedTurn($conversation, '¿cuánto se vendió hoy?', 'Fueron Q 1,200.', promptTokens: 2500);
+
+    expect(closedBySize($conversation))->toBeTrue();
+
+    summarizeAt(1000);
+
+    expect(closedBySize($conversation))->toBeFalse();
 });
