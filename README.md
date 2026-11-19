@@ -45,7 +45,7 @@ in its own service provider:
 | `AccessGate` | Who may use it, who may configure it, the platform's monthly budget |
 | `BudgetAlerts` | Who is warned when usage crosses its threshold |
 | `EntityLabels` | How the records a conversation touched are shown, and whether the person can see each one |
-| `EntitySearch` | The records a person can attach to a message with `@`, found by text, grouped |
+| `EntitySearch` | The records a person can attach to a message with `@`, found by text, grouped. Give `model_key` only to a type that uses it: a ref whose key changes nothing is dropped |
 | `PreviewDetails` | A preview as staff reads it on the Confirm card |
 | `PlatformGrant` | The platform's switch and budget for a workspace, by id |
 | `GuideScreens` | The panel screens a guide page talks about, as a given person sees them |
@@ -67,7 +67,7 @@ AssistantNaming::use('panel_assistant');   // config('panel_assistant.*'), table
 ```bash
 php artisan vendor:publish --tag=assistant-config       # config/<name>.php, with the engine defaults
 php artisan vendor:publish --tag=assistant-lang         # lang/<locale>/<name>.php
-php artisan vendor:publish --tag=assistant-migrations   # two migrations: workspace and platform tables
+php artisan vendor:publish --tag=assistant-migrations   # the workspace and platform tables, and their later changes
 ```
 
 Then, in the app:
@@ -142,6 +142,9 @@ labels the records the panel opens the assistant with.
 ## Upgrading from 0.1.x
 
 1. Implement `PanelSnapshot::principalKey()` and bind `EntitySearch` in the app's provider.
+   `principalKey()` must equal `PrincipalKey::of()` of the person who is signed in: use
+   `PrincipalKey::forModel(YourUser::class, $userId)`, which reads the model's own table (not
+   `users:` unless that is its table). On a mismatch every Confirm and Reject answers 403.
 2. Add the new translation keys (above) to the app's published files.
 3. Write a migration in the app with the columns of
    `database/migrations/2026_11_19_000000_add_audience_to_assistant_conversations.php`: an app that
