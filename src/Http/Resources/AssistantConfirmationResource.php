@@ -37,7 +37,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *
  * `entities`: con `confirmed`, los registros que la escritura tocó o creó ({@see AssistantEntityResource}, la misma forma
  * que `conversations/{id}/entities`); `[]` en los demás estados. Una página de mensajes los etiqueta de una vez para
- * todas sus tarjetas ({@see self::entitiesOf()}, desde {@see AssistantMessageResource}); una tarjeta sola, al serializarse.
+ * todas sus tarjetas, junto con los adjuntos de sus mensajes ({@see AssistantMessageResource::newCollection()}, que los
+ * pasa con {@see self::withEntities()}); una tarjeta sola, al serializarse ({@see self::entitiesOf()}).
  *
  * @mixin AssistantConfirmation
  */

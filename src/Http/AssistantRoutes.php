@@ -51,6 +51,8 @@ final class AssistantRoutes
                     ->whereNumber('conversation')->name('conversations.messages.index');
                 Route::get('conversations/{conversation}/entities', [AssistantEntityController::class, 'index'])
                     ->whereNumber('conversation')->name('conversations.entities.index');
+                Route::get('entities/label', [AssistantEntityController::class, 'label'])->name('entities.label');
+                Route::get('entities/search', [AssistantEntityController::class, 'search'])->name('entities.search');
                 Route::get('suggestions', [AssistantSuggestionController::class, 'index'])->name('suggestions.index');
                 Route::get('turns/{turn}', [AssistantTurnController::class, 'show'])
                     ->whereNumber('turn')->name('turns.show');

@@ -5,6 +5,7 @@ namespace SchoolAid\Assistant\Models;
 use SchoolAid\Assistant\Models\Concerns\HasAssistantTable;
 use SchoolAid\Assistant\Models\Concerns\InWorkspace;
 use SchoolAid\Assistant\Support\PanelUsers;
+use SchoolAid\Assistant\Enums\AssistantAudienceEnum;
 use SchoolAid\Assistant\Enums\AssistantTurnStatusEnum;
 use Carbon\CarbonImmutable;
 use SchoolAid\Assistant\Database\Factories\AssistantConversationFactory;
@@ -18,7 +19,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * @property int $id
- * @property int $user_id
+ * @property int|null $user_id
+ * @property AssistantAudienceEnum $audience
  * @property string|null $title
  * @property string|null $system_prompt
  * @property CarbonImmutable $created_at
@@ -32,7 +34,17 @@ class AssistantConversation extends Model
 
     private const KEPT_WRITE = 'has_kept_write';
 
-    protected $fillable = ['user_id', 'title', 'system_prompt'];
+    protected $fillable = ['user_id', 'audience', 'title', 'system_prompt'];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'audience' => AssistantAudienceEnum::class,
+        ];
+    }
 
     protected static function newFactory(): AssistantConversationFactory
     {

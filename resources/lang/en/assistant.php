@@ -16,6 +16,7 @@ return [
         'assistant_confirmation_forbidden' => 'Only the person who asked for this action can confirm or reject it.',
         'assistant_choice_not_available' => 'That option can no longer be chosen. Write your answer or ask for the options again.',
         'assistant_api_key_invalid' => 'The market API key stopped working. Whoever manages the assistant has to replace or remove it in its settings.',
+        'assistant_mention_not_available' => 'One of the attached records is no longer available. Remove it and send again.',
     ],
 
     /*
@@ -41,6 +42,14 @@ return [
         'content_max' => 'The message cannot be longer than 4000 characters.',
         'choice_id_string' => 'The chosen option is not valid.',
         'choice_id_with_content' => 'Choose an option or write a message, not both.',
+        'mentions_required' => 'Name at least one record.',
+        'mentions_list' => 'The attached records must be a list.',
+        'mentions_max' => 'A message cannot have more than :max attached records.',
+        'mentions_invalid' => 'One of the attached records is not valid.',
+        'mentions_distinct' => 'A record is attached twice.',
+        'search_q_string' => 'The search must be text.',
+        'search_q_max' => 'The search text cannot be longer than :max characters.',
+        'search_conversation_invalid' => 'The conversation is not valid.',
         'helpful_required' => 'Say whether the answer helped you.',
         'helpful_boolean' => 'Say yes or no to whether the answer helped you.',
         'comment_string' => 'The comment must be text.',
@@ -104,6 +113,18 @@ return [
             'active' => 'Active',
             'inactive' => 'Inactive',
         ],
+    ],
+
+    /*
+    | Groups of the `@` record picker (GlobalEntitySearch): the type the global search returns.
+    */
+    'search_groups' => [
+        'student' => 'Students',
+        'member' => 'Members',
+        'family' => 'Families',
+        'customer' => 'Customers',
+        'order' => 'Orders',
+        'plan' => 'Plans',
     ],
 
     /*

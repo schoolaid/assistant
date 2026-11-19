@@ -9,6 +9,7 @@ use SchoolAid\Assistant\Http\Resources\AssistantMessageResource;
 use SchoolAid\Assistant\Http\Resources\AssistantTurnResource;
 use SchoolAid\Assistant\Models\AssistantConversation;
 use SchoolAid\Assistant\Services\AssistantMessageSender;
+use SchoolAid\Assistant\Services\Entities\AssistantMentions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -46,7 +47,8 @@ class AssistantMessageController extends AssistantController
 
     /**
      * 202 con el turno en cola; el panel hace poll de `assistant/turns/{turn}`. Con `choice_id` contesta la última
-     * pregunta con opciones. Los 409 y el 422 de una opción que no se puede elegir los responde
+     * pregunta con opciones; con `content`, puede llevar `mentions` (registros adjuntos). Los 409, el 422 de una opción
+     * que no se puede elegir y el de un adjunto que no se puede ver los responde
      * {@see \SchoolAid\Assistant\Services\AssistantRequestRefused}; el 429 del tope del mes,
      * {@see \SchoolAid\Assistant\Services\Usage\AssistantBudgetExceeded}.
      */
@@ -56,7 +58,12 @@ class AssistantMessageController extends AssistantController
 
         $turn = $choiceId !== null
             ? $this->sender->sendChoice($conversation, $request->user(), (string) $choiceId)
-            : $this->sender->send($conversation, $request->user(), (string) $request->validated('content'));
+            : $this->sender->send(
+                $conversation,
+                $request->user(),
+                (string) $request->validated('content'),
+                mentions: AssistantMentions::refs($request->validated('mentions') ?? []),
+            );
 
         return (new AssistantTurnResource($turn))
             ->response()

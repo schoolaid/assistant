@@ -2,6 +2,8 @@
 
 namespace SchoolAid\Assistant\Services;
 
+use SchoolAid\Assistant\Services\Entities\AssistantEntityRef;
+use SchoolAid\Assistant\Services\Entities\AssistantMentions;
 use SchoolAid\Assistant\Support\AssistantNaming;
 use Illuminate\Contracts\Debug\ShouldntReport;
 use Illuminate\Http\JsonResponse;
@@ -24,7 +26,12 @@ class AssistantRequestRefused extends RuntimeException implements ShouldntReport
 
     public const API_KEY_INVALID = 'assistant_api_key_invalid';
 
-    public function __construct(public readonly string $errorCode, public readonly int $status)
+    public const MENTION_NOT_AVAILABLE = 'assistant_mention_not_available';
+
+    /**
+     * @param  list<AssistantEntityRef>  $mentions  los adjuntos que no se pudieron resolver; van en la respuesta
+     */
+    public function __construct(public readonly string $errorCode, public readonly int $status, public readonly array $mentions = [])
     {
         parent::__construct($errorCode);
     }
@@ -71,11 +78,23 @@ class AssistantRequestRefused extends RuntimeException implements ShouldntReport
         return new self(self::API_KEY_INVALID, Response::HTTP_CONFLICT);
     }
 
+    /**
+     * Un registro adjunto al mensaje no existe, se borró, queda fuera del alcance de la persona o de un módulo que no
+     * puede ver, o es de un tipo que la app no conoce. La respuesta dice cuáles (`mentions`).
+     *
+     * @param  list<AssistantEntityRef>  $refs
+     */
+    public static function mentionNotAvailable(array $refs): self
+    {
+        return new self(self::MENTION_NOT_AVAILABLE, Response::HTTP_UNPROCESSABLE_ENTITY, array_values($refs));
+    }
+
     public function render(): JsonResponse
     {
         return response()->json([
             'message' => AssistantNaming::trans("errors.{$this->errorCode}"),
             'code' => $this->errorCode,
+            ...($this->mentions === [] ? [] : ['mentions' => AssistantMentions::toPayload($this->mentions)]),
         ], $this->status);
     }
 }

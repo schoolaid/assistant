@@ -12,6 +12,8 @@ use SchoolAid\Assistant\Models\AssistantConfirmation;
 use SchoolAid\Assistant\Models\AssistantConversation;
 use SchoolAid\Assistant\Models\AssistantMessage;
 use SchoolAid\Assistant\Models\AssistantTurn;
+use SchoolAid\Assistant\Services\Entities\AssistantEntityRef;
+use SchoolAid\Assistant\Services\Entities\AssistantMentions;
 use SchoolAid\Assistant\Services\Settings\AssistantSettings;
 use SchoolAid\Assistant\Services\Usage\AssistantBudget;
 use SchoolAid\Assistant\Services\Usage\AssistantBudgetExceeded;
@@ -25,7 +27,9 @@ use Illuminate\Support\Str;
  * Lo que pasa cuando la persona escribe en una conversación: abre un turno y despacha su primer paso.
  *
  * Antes, en este orden: el tope del mes del market y el de la persona ({@see AssistantBudget}), la llave propia del
- * market rechazada por Anthropic (409 `assistant_api_key_invalid`, {@see AssistantSettings::ownKeyRejected()}), un paso en cola o en curso o una confirmación de la
+ * market rechazada por Anthropic (409 `assistant_api_key_invalid`, {@see AssistantSettings::ownKeyRejected()}), los
+ * registros adjuntos (`mentions`): si alguno no se puede etiquetar con {@see AssistantMentions::labelled()}, 422
+ * `assistant_mention_not_available` con los que fallaron; luego un paso en cola o en curso o una confirmación de la
  * conversación que otra request está ejecutando (409, ver {@see AssistantConfirmation::scopeExecuting()}: un deshacer
  * corre sin turno en cola ni en curso) y el fin de la conversación (409 `assistant_conversation_too_long`, ver
  * {@see ConversationLimit}: la última respuesta llegó al tope de entrada o la API rechazó el último turno con un 400 o
@@ -41,9 +45,11 @@ use Illuminate\Support\Str;
  *   de un turno: escribir no lo descarta.
  * - En el primer turno se fijan las instrucciones de la conversación (`system_prompt`); no se recalculan después.
  * - El mensaje `user` guarda en `content` el contexto del pedido (fecha, hora y sucursal), los avisos y el texto, y en
- *   `display_text` lo que el panel muestra. El primer mensaje de la conversación lleva antes quién escribe y los
- *   clientes del market ({@see Instructions::conversationContext()}): no van en `system_prompt`, que es
- *   igual para todos y por eso se lee de la caché entre usuarios.
+ *   `display_text` lo que el panel muestra. Con adjuntos, su bloque ({@see AssistantMentions::block()}) va después de
+ *   los avisos y antes del texto, y `payload` guarda sus refs (`{"mentions": [...]}`); sin adjuntos, `payload` es null.
+ *   El primer mensaje de la conversación lleva antes quién escribe y los clientes del market
+ *   ({@see Instructions::conversationContext()}): no van en `system_prompt`, que es igual para todos y por eso se lee
+ *   de la caché entre usuarios.
  * - Una elección ({@see self::sendChoice()}) es un mensaje más: contesta la última pregunta con opciones (`choices`)
  *   sin un mensaje `user` posterior, con una opción `selectable`; si no, 422 `assistant_choice_not_available`. Se
  *   revisa con la conversación bloqueada, después de los 409.
@@ -72,19 +78,21 @@ class AssistantMessageSender
         private readonly ConversationLimit $limit,
         private readonly AssistantSettings $settings,
         private readonly PanelScope $scope,
+        private readonly AssistantMentions $mentionLabels,
     ) {
     }
 
     /**
      * @param  string  $text  lo que va al modelo después del contexto
      * @param  string|null  $displayText  lo que el panel muestra; por omisión, `$text`
+     * @param  list<AssistantEntityRef>  $mentions  los registros que la persona adjuntó
      *
      * @throws AssistantBudgetExceeded
      * @throws AssistantRequestRefused
      */
-    public function send(AssistantConversation $conversation, Authenticatable $user, string $text, ?string $displayText = null): AssistantTurn
+    public function send(AssistantConversation $conversation, Authenticatable $user, string $text, ?string $displayText = null, array $mentions = []): AssistantTurn
     {
-        return $this->openTurn($conversation, $user, fn (): array => [$text, $displayText ?? $text]);
+        return $this->openTurn($conversation, $user, fn (): array => [$text, $displayText ?? $text], $mentions);
     }
 
     /**
@@ -104,11 +112,12 @@ class AssistantMessageSender
 
     /**
      * @param  Closure(AssistantConversation): array{0: string, 1: string}  $message  el texto para el modelo y el del panel, con la conversación bloqueada
+     * @param  list<AssistantEntityRef>  $mentions
      *
      * @throws AssistantBudgetExceeded
      * @throws AssistantRequestRefused
      */
-    private function openTurn(AssistantConversation $conversation, Authenticatable $user, Closure $message): AssistantTurn
+    private function openTurn(AssistantConversation $conversation, Authenticatable $user, Closure $message, array $mentions = []): AssistantTurn
     {
         $this->budget->ensureWithinBudget((int) $user->getKey());
 
@@ -116,9 +125,10 @@ class AssistantMessageSender
             throw AssistantRequestRefused::apiKeyInvalid();
         }
 
+        $mentionsBlock = $this->mentionsBlock($mentions);
         $context = $this->scope->capture($user);
 
-        $turn = DB::transaction(function () use ($conversation, $user, $message, $context): AssistantTurn {
+        $turn = DB::transaction(function () use ($conversation, $user, $message, $context, $mentions, $mentionsBlock): AssistantTurn {
             $locked = AssistantConversation::query()->whereKey($conversation->getKey())->lockForUpdate()->firstOrFail();
 
             if ($locked->turns()->whereIn('status', [AssistantTurnStatusEnum::Queued->value, AssistantTurnStatusEnum::Running->value])->exists()) {
@@ -155,6 +165,7 @@ class AssistantMessageSender
                     ...($opensConversation ? [$this->instructions->conversationContext($user)] : []),
                     $this->instructions->turnContext($context, $user, now()),
                     ...$notices,
+                    ...($mentionsBlock === null ? [] : [$mentionsBlock]),
                     $text,
                 ],
             );
@@ -166,6 +177,7 @@ class AssistantMessageSender
                 'kind' => AssistantMessageKindEnum::Text,
                 'content' => $blocks,
                 'display_text' => $displayText,
+                'payload' => $mentions === [] ? null : ['mentions' => AssistantMentions::toPayload($mentions)],
             ]);
 
             return $turn;
@@ -174,6 +186,30 @@ class AssistantMessageSender
         RunAssistantStep::dispatch($turn->id);
 
         return $turn;
+    }
+
+    /**
+     * El bloque de los adjuntos para el modelo, o null sin adjuntos.
+     *
+     * @param  list<AssistantEntityRef>  $mentions
+     *
+     * @throws AssistantRequestRefused si alguno no se puede etiquetar
+     */
+    private function mentionsBlock(array $mentions): ?string
+    {
+        if ($mentions === []) {
+            return null;
+        }
+
+        $mentions = array_values($mentions);
+        $labelled = $this->mentionLabels->labelled($mentions);
+        $missing = array_values(array_filter($mentions, fn (int $index): bool => $labelled[$index] === null, ARRAY_FILTER_USE_KEY));
+
+        if ($missing !== []) {
+            throw AssistantRequestRefused::mentionNotAvailable($missing);
+        }
+
+        return AssistantMentions::block($mentions, $labelled);
     }
 
     /**

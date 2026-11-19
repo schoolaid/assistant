@@ -10,9 +10,10 @@ use SchoolAid\Assistant\Models\AssistantConversation;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Qué registros salieron en una conversación, para que el panel los enlace (spec, «Salida»): los que el agente leyó
- * con una tool y los que tocaron o crearon sus escrituras confirmadas. Sin columna propia: sale de los mensajes
- * guardados (como {@see \SchoolAid\Assistant\Support\AssistantTurnSteps}) y de las confirmaciones.
+ * Qué registros salieron en una conversación, para que el panel los enlace (spec, «Salida»): los que la persona adjuntó
+ * a sus mensajes, los que el agente leyó con una tool y los que tocaron o crearon sus escrituras confirmadas. Sin
+ * columna propia: sale de los mensajes guardados (como {@see \SchoolAid\Assistant\Support\AssistantTurnSteps}) y de
+ * las confirmaciones.
  *
  * Qué argumento o clave del resultado de cada tool es un registro lo dice `AssistantNaming::config('entities')`: por tool, una
  * lista de `{type, id, model_key?, date?}` con rutas `input.<arg>` (los argumentos de la llamada), `output.<clave>` (lo
@@ -35,8 +36,9 @@ final class AssistantEntityExtractor
     private const WILDCARD = '*';
 
     /**
-     * Los registros de las llamadas que terminaron bien (con `tool_result` sin `is_error`; una sin respuesta o con
-     * error no cuenta) y de las confirmaciones `confirmed`, en el orden en que aparecieron, sin repetir y hasta
+     * Los registros que la persona adjuntó a sus mensajes ({@see AssistantMentions}), los de las llamadas que terminaron
+     * bien (con `tool_result` sin `is_error`; una sin respuesta o con error no cuenta) y los de las confirmaciones
+     * `confirmed`, en el orden en que aparecieron (un adjunto, en la posición de su mensaje), sin repetir y hasta
      * {@see self::MAX_ENTITIES}. De una llamada cuentan sus argumentos y lo que respondió (`output`); lo que crea una
      * escritura llega con la confirmación (`result`).
      *
@@ -44,17 +46,49 @@ final class AssistantEntityExtractor
      */
     public function fromConversation(AssistantConversation $conversation): array
     {
+        return array_slice($this->unique($this->appearances($conversation)), 0, self::MAX_ENTITIES);
+    }
+
+    /**
+     * Los mismos registros que {@see self::fromConversation()}, pero del más reciente al más viejo: cada uno en la
+     * posición de su última aparición (uno leído al principio y otra vez al final va primero) y sin el tope de
+     * {@see self::MAX_ENTITIES}, que se quedaría con los más viejos. Lo usa el selector `@` del panel.
+     *
+     * @return list<AssistantEntityRef>
+     */
+    public function recentFromConversation(AssistantConversation $conversation): array
+    {
+        return $this->unique(array_reverse($this->appearances($conversation)));
+    }
+
+    /**
+     * Cada aparición de un registro en la conversación (con repetidos), en el orden en que aparecieron: los adjuntos,
+     * las llamadas que terminaron bien y las confirmaciones `confirmed` (ver {@see self::fromConversation()}).
+     *
+     * @return list<AssistantEntityRef>
+     */
+    private function appearances(AssistantConversation $conversation): array
+    {
         $calls = [];
         $answered = [];
 
         $messages = $conversation->messages()
             ->where(fn (Builder $query) => $query
                 ->where(fn (Builder $responses) => $responses->where('role', 'assistant')->where('kind', AssistantMessageKindEnum::Text->value))
-                ->orWhere(fn (Builder $toolResults) => $toolResults->where('role', 'user')->where('kind', AssistantMessageKindEnum::Internal->value)))
+                ->orWhere(fn (Builder $toolResults) => $toolResults->where('role', 'user')->where('kind', AssistantMessageKindEnum::Internal->value))
+                ->orWhere(fn (Builder $mentions) => $mentions->where('role', 'user')->where('kind', AssistantMessageKindEnum::Text->value)->whereNotNull('payload')))
             ->orderBy('id')
-            ->get(['id', 'role', 'kind', 'content']);
+            ->get(['id', 'role', 'kind', 'content', 'payload']);
+
+        $sources = [];
 
         foreach ($messages as $message) {
+            if ($message->role === 'user' && $message->kind === AssistantMessageKindEnum::Text) {
+                $sources[] = ['position' => (int) $message->id, 'refs' => AssistantMentions::fromPayload($message->payload)];
+
+                continue;
+            }
+
             foreach ((array) $message->content as $block) {
                 if (! is_array($block)) {
                     continue;
@@ -73,8 +107,6 @@ final class AssistantEntityExtractor
                 }
             }
         }
-
-        $sources = [];
 
         foreach ($calls as $toolUseId => $call) {
             if (array_key_exists($toolUseId, $answered)) {
@@ -96,7 +128,7 @@ final class AssistantEntityExtractor
 
         usort($sources, fn (array $first, array $second): int => $first['position'] <=> $second['position']);
 
-        return array_slice($this->unique(array_merge(...array_column($sources, 'refs'))), 0, self::MAX_ENTITIES);
+        return array_merge(...array_column($sources, 'refs'));
     }
 
     /**

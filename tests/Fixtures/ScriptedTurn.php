@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use SchoolAid\Assistant\Contracts\AccessGate;
 use SchoolAid\Assistant\Contracts\BudgetAlerts;
+use SchoolAid\Assistant\Contracts\EntityLabels;
+use SchoolAid\Assistant\Contracts\EntitySearch;
 use SchoolAid\Assistant\Contracts\Instructions;
 use SchoolAid\Assistant\Contracts\PanelScope;
 use SchoolAid\Assistant\Contracts\ToolSource;
@@ -55,6 +57,8 @@ trait ScriptedTurn
         $this->app->singleton(BudgetAlerts::class, FakeBudgetAlerts::class);
         $this->app->singleton(WritePreviews::class, FakeWritePreviews::class);
         $this->app->singleton(ToolSource::class, FakeToolSource::class);
+        $this->app->singleton(EntityLabels::class, FakeEntityLabels::class);
+        $this->app->singleton(EntitySearch::class, FakeEntitySearch::class);
 
         config([
             HostServiceProvider::NAME.'.anthropic.api_key' => 'sk-test',

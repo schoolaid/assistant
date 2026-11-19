@@ -2,6 +2,7 @@
 
 namespace SchoolAid\Assistant\Http\Requests;
 
+use SchoolAid\Assistant\Services\Entities\AssistantMentions;
 use SchoolAid\Assistant\Support\AssistantNaming;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -11,6 +12,9 @@ use Illuminate\Foundation\Http\FormRequest;
  *
  * Un mensaje lleva `content` (lo escrito) o `choice_id` (la opción elegida con un botón), nunca los dos. Que la opción
  * se pueda elegir lo revisa {@see \SchoolAid\Assistant\Services\AssistantMessageSender::sendChoice()}.
+ *
+ * `mentions` ({@see AssistantMentions::rules()}) solo acompaña a `content`. Que cada adjunto se pueda ver lo revisa
+ * {@see \SchoolAid\Assistant\Services\AssistantMessageSender::send()}.
  */
 class StoreAssistantMessageRequest extends FormRequest
 {
@@ -26,7 +30,8 @@ class StoreAssistantMessageRequest extends FormRequest
     {
         return [
             'content' => ['required_without:choice_id', 'nullable', 'string', 'max:4000'],
-            'choice_id' => ['nullable', 'string', 'max:64', 'prohibits:content'],
+            'choice_id' => ['nullable', 'string', 'max:64', 'prohibits:content,mentions'],
+            ...AssistantMentions::rules('mentions'),
         ];
     }
 
@@ -42,6 +47,7 @@ class StoreAssistantMessageRequest extends FormRequest
             'choice_id.string' => AssistantNaming::trans('validation.choice_id_string'),
             'choice_id.max' => AssistantNaming::trans('validation.choice_id_string'),
             'choice_id.prohibits' => AssistantNaming::trans('validation.choice_id_with_content'),
+            ...AssistantMentions::messages('mentions'),
         ];
     }
 }

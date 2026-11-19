@@ -20,6 +20,7 @@ use SchoolAid\Assistant\Services\Tools\ToolCallResult;
 use SchoolAid\Assistant\Services\Undo\UndoOffer;
 use SchoolAid\Assistant\Support\AssistantActionEventMark;
 use SchoolAid\Assistant\Support\ConversationLimit;
+use SchoolAid\Assistant\Support\PrincipalKey;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -303,7 +304,7 @@ class ConfirmationExecutor
             throw AssistantRequestRefused::confirmationForbidden();
         }
 
-        if ($context->userId() !== (int) $user->getKey()) {
+        if ($context->principalKey() !== PrincipalKey::of($user)) {
             throw AssistantRequestRefused::confirmationForbidden();
         }
 

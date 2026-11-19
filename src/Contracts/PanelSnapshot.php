@@ -12,6 +12,13 @@ interface PanelSnapshot
     public function userId(): int;
 
     /**
+     * Identidad `{tabla}:{id}` de quien envió el mensaje ({@see \SchoolAid\Assistant\Support\PrincipalKey}).
+     * `userId()` no sirve para comparar principales: choca entre clases de cliente con el mismo id.
+     * `userId()` se queda para el staff.
+     */
+    public function principalKey(): string;
+
+    /**
      * @return array<string, mixed>
      */
     public function toArray(): array;

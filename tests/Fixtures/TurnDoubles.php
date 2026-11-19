@@ -8,11 +8,14 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Laravel\Mcp\Server\Tool;
 use SchoolAid\Assistant\Contracts\AccessGate;
 use SchoolAid\Assistant\Contracts\BudgetAlerts;
+use SchoolAid\Assistant\Contracts\EntityLabels;
+use SchoolAid\Assistant\Contracts\EntitySearch;
 use SchoolAid\Assistant\Contracts\Instructions;
 use SchoolAid\Assistant\Contracts\PanelScope;
 use SchoolAid\Assistant\Contracts\PanelSnapshot;
 use SchoolAid\Assistant\Contracts\ToolSource;
 use SchoolAid\Assistant\Contracts\WritePreviews;
+use SchoolAid\Assistant\Services\Entities\AssistantEntityRef;
 use SchoolAid\Assistant\Services\Tools\ToolBridge;
 use SchoolAid\Assistant\Services\Tools\ToolCallResult;
 
@@ -30,6 +33,11 @@ final class FakeSnapshot implements PanelSnapshot
     public function userId(): int
     {
         return $this->userId;
+    }
+
+    public function principalKey(): string
+    {
+        return "users:{$this->userId}";
     }
 
     public function toArray(): array
@@ -201,5 +209,58 @@ final class FakeToolBridge implements ToolBridge
         $this->calls[] = ['tool' => $tool, 'arguments' => $arguments];
 
         return new ToolCallResult(false, '{"ok":true}', ['ok' => true]);
+    }
+}
+
+/**
+ * Labels every record with an id under 1000 as "{type} {id}"; the others are records the person
+ * cannot see.
+ */
+final class FakeEntityLabels implements EntityLabels
+{
+    public const VISIBLE_BELOW = 1000;
+
+    public function label(array $refs): array
+    {
+        $entities = [];
+
+        foreach ($refs as $ref) {
+            if ($ref->id < self::VISIBLE_BELOW) {
+                $entities[] = [
+                    'type' => $ref->type, 'resource' => $ref->modelKey ?? $ref->type, 'id' => $ref->id,
+                    'date' => $ref->date, 'label' => "{$ref->type} {$ref->id}", 'detail' => null, 'created' => $ref->created,
+                ];
+            }
+        }
+
+        return $entities;
+    }
+
+    public function labelEach(array $lists): array
+    {
+        return array_map(fn (array $refs): array => $this->label($refs), $lists);
+    }
+}
+
+/**
+ * Answers with $results and records every [query, limit] it was asked.
+ */
+final class FakeEntitySearch implements EntitySearch
+{
+    /**
+     * @var list<array{ref: AssistantEntityRef, group: string}>
+     */
+    public array $results = [];
+
+    /**
+     * @var list<array{0: string, 1: int}>
+     */
+    public array $queries = [];
+
+    public function search(string $query, int $limit): array
+    {
+        $this->queries[] = [$query, $limit];
+
+        return $this->results;
     }
 }

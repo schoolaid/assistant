@@ -2,10 +2,13 @@
 
 namespace SchoolAid\Assistant\Http\Resources;
 
+use SchoolAid\Assistant\Contracts\EntityLabels;
 use SchoolAid\Assistant\Models\AssistantExport;
 use SchoolAid\Assistant\Enums\AssistantMessageKindEnum;
 use SchoolAid\Assistant\Models\AssistantConfirmation;
 use SchoolAid\Assistant\Models\AssistantMessage;
+use SchoolAid\Assistant\Services\Entities\AssistantEntityExtractor;
+use SchoolAid\Assistant\Services\Entities\AssistantMentions;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -16,8 +19,11 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * pregunta y sus botones) solo en los `choices`; null en los demás. El panel ofrece los botones solo si el último
  * mensaje de la conversación es `choices`.
  *
- * Una colección de mensajes etiqueta de una vez los `entities` de todas sus tarjetas ({@see self::newCollection()}): una
- * consulta por tipo de registro, no por tarjeta.
+ * `entities`: los registros que la persona adjuntó al mensaje ({@see AssistantMentions}, la forma de
+ * {@see AssistantEntityResource}), etiquetados al leer: uno que ya no se puede ver deja de salir. `[]` si no tiene.
+ *
+ * Una colección de mensajes etiqueta de una vez los adjuntos de todos sus mensajes y los `entities` de todas sus
+ * tarjetas ({@see self::newCollection()}): una consulta por tipo de registro, no por mensaje ni por tarjeta.
  *
  * @mixin AssistantMessage
  */
@@ -29,29 +35,49 @@ class AssistantMessageResource extends JsonResource
     private ?array $confirmationEntities = null;
 
     /**
-     * Las tarjetas con su confirmación ya cargada (`with('confirmation')`) reciben sus `entities` en un solo lote; si no
-     * vino cargada, la tarjeta los resuelve al serializarse.
+     * @var list<array{type: string, resource: string, id: int, date: string|null, label: string, detail: string|null, created: bool}>|null
+     */
+    private ?array $mentionEntities = null;
+
+    /**
+     * Los adjuntos de todos los mensajes y los `entities` de las tarjetas con su confirmación ya cargada
+     * (`with('confirmation')`) se etiquetan en una sola llamada a {@see EntityLabels::labelEach()}; una tarjeta cuya
+     * confirmación no vino cargada los resuelve al serializarse.
      *
      * @param  mixed  $resource
      */
     protected static function newCollection($resource): AnonymousResourceCollection
     {
         $collection = parent::newCollection($resource);
-        $cards = $collection->collection
-            ->filter(fn (self $message): bool => $message->kind === AssistantMessageKindEnum::Confirmation
-                && $message->resource->relationLoaded('confirmation')
-                && $message->resource->confirmation instanceof AssistantConfirmation)
-            ->map(fn (self $message): AssistantConfirmation => $message->resource->confirmation);
+        $extractor = app(AssistantEntityExtractor::class);
+        $lists = [];
 
-        foreach (AssistantConfirmationResource::entitiesOf($cards->all()) as $index => $entities) {
-            $collection->collection[$index]->confirmationEntities = $entities;
+        foreach ($collection->collection as $index => $message) {
+            $lists["mentions.{$index}"] = AssistantMentions::fromPayload($message->resource->payload);
+
+            if ($message->kind === AssistantMessageKindEnum::Confirmation
+                && $message->resource->relationLoaded('confirmation')
+                && $message->resource->confirmation instanceof AssistantConfirmation) {
+                $lists["card.{$index}"] = $extractor->fromConfirmation($message->resource->confirmation);
+            }
+        }
+
+        foreach (app(EntityLabels::class)->labelEach($lists) as $key => $entities) {
+            [$list, $index] = explode('.', (string) $key, 2);
+            $message = $collection->collection[(int) $index];
+
+            if ($list === 'mentions') {
+                $message->mentionEntities = $entities;
+            } else {
+                $message->confirmationEntities = $entities;
+            }
         }
 
         return $collection;
     }
 
     /**
-     * @return array{id: int, role: string, kind: string, text: string|null, confirmation: AssistantConfirmationResource|null, choices: array{question: string, options: list<array{id: string, label: string, detail: string|null, selectable: bool}>}|null, chart: array<string, mixed>|null, file: AssistantExportResource|null, helpful: bool|null, created_at: string|null}
+     * @return array{id: int, role: string, kind: string, text: string|null, entities: AnonymousResourceCollection, confirmation: AssistantConfirmationResource|null, choices: array{question: string, options: list<array{id: string, label: string, detail: string|null, selectable: bool}>}|null, chart: array<string, mixed>|null, file: AssistantExportResource|null, helpful: bool|null, created_at: string|null}
      */
     public function toArray(Request $request): array
     {
@@ -62,6 +88,7 @@ class AssistantMessageResource extends JsonResource
             'role' => $this->role,
             'kind' => $this->kind->value,
             'text' => $this->display_text,
+            'entities' => AssistantEntityResource::collection($this->mentionEntities ?? $this->labelMentions()),
             'confirmation' => $confirmation === null ? null : $this->confirmationResource($confirmation),
             'choices' => $this->kind === AssistantMessageKindEnum::Choices ? $this->choicesForPanel() : null,
             'chart' => $this->kind === AssistantMessageKindEnum::Chart ? ((array) $this->resource->payload)['chart'] ?? null : null,
@@ -69,6 +96,18 @@ class AssistantMessageResource extends JsonResource
             'helpful' => $this->helpful,
             'created_at' => $this->created_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * Los adjuntos de un mensaje serializado fuera de una colección.
+     *
+     * @return list<array{type: string, resource: string, id: int, date: string|null, label: string, detail: string|null, created: bool}>
+     */
+    private function labelMentions(): array
+    {
+        $refs = AssistantMentions::fromPayload($this->resource->payload);
+
+        return $refs === [] ? [] : app(EntityLabels::class)->label($refs);
     }
 
     /**

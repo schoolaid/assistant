@@ -16,6 +16,7 @@ return [
         'assistant_confirmation_forbidden' => 'Solo la persona que pidió esta acción puede confirmarla o rechazarla.',
         'assistant_choice_not_available' => 'Esa opción ya no se puede elegir. Escribe tu respuesta o pide las opciones de nuevo.',
         'assistant_api_key_invalid' => 'La llave de API del market dejó de funcionar. Quien administra el asistente tiene que cambiarla o quitarla en su configuración.',
+        'assistant_mention_not_available' => 'Uno de los registros adjuntos ya no está disponible. Quítalo y vuelve a enviar.',
     ],
 
     /*
@@ -41,6 +42,14 @@ return [
         'content_max' => 'El mensaje no puede pasar de 4000 caracteres.',
         'choice_id_string' => 'La opción elegida no es válida.',
         'choice_id_with_content' => 'Elige una opción o escribe un mensaje, no los dos.',
+        'mentions_required' => 'Indica al menos un registro.',
+        'mentions_list' => 'Los registros adjuntos deben ir en una lista.',
+        'mentions_max' => 'No se pueden adjuntar más de :max registros a un mensaje.',
+        'mentions_invalid' => 'Uno de los registros adjuntos no es válido.',
+        'mentions_distinct' => 'Un registro está adjunto dos veces.',
+        'search_q_string' => 'La búsqueda debe ser texto.',
+        'search_q_max' => 'El texto a buscar no puede pasar de :max caracteres.',
+        'search_conversation_invalid' => 'La conversación no es válida.',
         'helpful_required' => 'Indica si la respuesta te sirvió.',
         'helpful_boolean' => 'Indica con sí o no si la respuesta te sirvió.',
         'comment_string' => 'El comentario debe ser texto.',
@@ -107,6 +116,18 @@ return [
             'active' => 'Activa',
             'inactive' => 'Inactiva',
         ],
+    ],
+
+    /*
+    | Grupos del selector `@` de registros (GlobalEntitySearch): el tipo que devuelve el buscador global.
+    */
+    'search_groups' => [
+        'student' => 'Estudiantes',
+        'member' => 'Miembros',
+        'family' => 'Familias',
+        'customer' => 'Clientes',
+        'order' => 'Órdenes',
+        'plan' => 'Planes',
     ],
 
     /*

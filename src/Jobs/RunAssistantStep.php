@@ -6,6 +6,7 @@ use SchoolAid\Assistant\Jobs\Concerns\RemembersWorkspace;
 use SchoolAid\Assistant\Enums\StepOutcomeEnum;
 use SchoolAid\Assistant\Models\AssistantTurn;
 use SchoolAid\Assistant\Services\Agent\AssistantTurnRunner;
+use SchoolAid\Assistant\Services\Audience\AudienceContracts;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -41,13 +42,15 @@ class RunAssistantStep implements ShouldQueue
         $this->rememberWorkspace();
     }
 
-    public function handle(AssistantTurnRunner $runner): void
+    public function handle(AudienceContracts $audiences): void
     {
         $turn = AssistantTurn::query()->find($this->turnId);
 
         if ($turn === null) {
             return;
         }
+
+        $runner = $audiences->make(AssistantTurnRunner::class, $turn->conversation()->withTrashed()->first());
 
         if ($runner->step($turn) === StepOutcomeEnum::Continue) {
             self::dispatch($this->turnId);

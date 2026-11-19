@@ -11,6 +11,7 @@ use SchoolAid\Assistant\Console\ResumeStaleTurnsCommand;
 use SchoolAid\Assistant\Http\AssistantRoutes;
 use SchoolAid\Assistant\Knowledge\KnowledgeSearch;
 use SchoolAid\Assistant\Knowledge\MeilisearchKnowledgeIndex;
+use SchoolAid\Assistant\Services\Audience\AudienceContracts;
 use SchoolAid\Assistant\Services\Tools\AssistantToolBridge;
 use SchoolAid\Assistant\Services\Tools\ToolBridge;
 use SchoolAid\Assistant\Support\AssistantActionEventMark;
@@ -49,6 +50,7 @@ class AssistantServiceProvider extends ServiceProvider
      */
     public array $singletons = [
         AssistantActionEventMark::class => AssistantActionEventMark::class,
+        AudienceContracts::class => AudienceContracts::class,
     ];
 
     public function register(): void
