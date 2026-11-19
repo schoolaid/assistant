@@ -33,6 +33,22 @@ it('translates with the published file of the app', function () {
         ->and(AssistantNaming::trans('step_fallback', ['tool' => 'x']))->not->toStartWith('panel_assistant.');
 });
 
+it('carries in both languages the texts of attached records and of the @ search', function (string $locale, string $key) {
+    $lines = Illuminate\Support\Arr::dot(require dirname(__DIR__, 2)."/resources/lang/{$locale}/assistant.php");
+
+    expect($lines[$key] ?? null)->toBeString()->not->toBe('')->not->toBe($key);
+})->with(['es', 'en'])->with([
+    'errors.assistant_mention_not_available',
+    'validation.mentions_required',
+    'validation.mentions_list',
+    'validation.mentions_max',
+    'validation.mentions_invalid',
+    'validation.mentions_distinct',
+    'validation.search_q_string',
+    'validation.search_q_max',
+    'validation.search_conversation_invalid',
+]);
+
 it('mounts the panel routes where the app says, throttled under its name', function () {
     Route::prefix('api')->group(fn () => AssistantRoutes::panel('panel-assistant', 'api.panel-assistant.'));
     Route::getRoutes()->refreshNameLookups();
