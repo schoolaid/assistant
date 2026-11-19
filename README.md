@@ -40,11 +40,12 @@ in its own service provider:
 | `ToolSource` | The MCP server's tools and instructions, which tools write |
 | `WritePreviews` | Whether a preview can be offered, how to discard its token, how long it lives |
 | `ToolCallLog` | Where each tool call is recorded |
-| `PanelScope` + `PanelSnapshot` | Run code as the person in the panel, with their scope |
+| `PanelScope` + `PanelSnapshot` | Run code as the person in the panel, with their scope; `principalKey()` is who sent the message as `{table}:{id}` |
 | `Instructions` | The fixed prompt and the context of each message |
 | `AccessGate` | Who may use it, who may configure it, the platform's monthly budget |
 | `BudgetAlerts` | Who is warned when usage crosses its threshold |
-| `EntityLabels` | How the records a conversation touched are shown |
+| `EntityLabels` | How the records a conversation touched are shown, and whether the person can see each one |
+| `EntitySearch` | The records a person can attach to a message with `@`, found by text, grouped |
 | `PreviewDetails` | A preview as staff reads it on the Confirm card |
 | `PlatformGrant` | The platform's switch and budget for a workspace, by id |
 | `GuideScreens` | The panel screens a guide page talks about, as a given person sees them |
@@ -87,6 +88,9 @@ Then, in the app:
   texts for those sections; replace them.
 - **Anthropic**: `anthropic.api_key`, `anthropic.url` and `anthropic.version` in the published
   config (`ANTHROPIC_API_KEY`…). Meilisearch comes from `scout.meilisearch.*`.
+- **Texts of attached records and the `@` search**: `errors.assistant_mention_not_available`,
+  `validation.mentions_*` and `validation.search_*` come with the published translations;
+  `search_groups` is the app's own (the group names its `EntitySearch` returns).
 
 ### One database per workspace, or a single one
 
@@ -122,10 +126,32 @@ a `summary` message that the panel never lists, and builds the history from the 
 `tests/SingleDatabase/ConversationSummaryTest.php` runs whole turns against a scripted Messages
 API (`tests/Fixtures/ScriptedTurn.php`).
 
+## Attached records and the `@` search
+
+A message may carry up to 10 records (`mentions: [{type, id, model_key?}]` with `content`). The
+engine labels each one again with `EntityLabels`, as the person: one that does not come back is
+refused with 422 `assistant_mention_not_available`. They are stored in `messages.payload`, shown in
+the history and given to the model as one line each (type, id, label).
+
+`GET {prefix}/entities/search?q=&conversation=` feeds the panel's `@` picker: with two characters or
+more it asks the app's `EntitySearch` for at most five per group; with less and a conversation, it
+offers that conversation's records, newest first. Everything goes through `EntityLabels`, so only
+what the person can see comes out. `GET {prefix}/entities/label` (`refs`, shaped like `mentions`)
+labels the records the panel opens the assistant with.
+
+## Upgrading from 0.1.x
+
+1. Implement `PanelSnapshot::principalKey()` and bind `EntitySearch` in the app's provider.
+2. Add the new translation keys (above) to the app's published files.
+3. Write a migration in the app with the columns of
+   `database/migrations/2026_11_19_000000_add_audience_to_assistant_conversations.php`: an app that
+   already published the first two migrations does not publish them again.
+4. In production, run it right after the deploy: until the `audience` column exists,
+   `assistant:resume-stale-turns` and `assistant:prune` skip every workspace. The chat itself does not
+   write `audience` and keeps working on the old schema.
+
 ## Not done yet
 
 - MarketAid does not require the package: it keeps its own copy of the engine, config,
   translations and migrations until it switches; they are the source of the ones here.
-- A change of schema after `v0.1.0` needs a new migration in each app that already published
-  the first two.
 - The task eval (`assistant:eval`) stays in MarketAid.
