@@ -49,6 +49,16 @@ it('carries in both languages the texts of attached records and of the @ search'
     'validation.search_conversation_invalid',
 ]);
 
+it('carries every text in both languages', function () {
+    $keys = fn (string $locale): array => array_keys(array_filter(
+        Illuminate\Support\Arr::dot(require dirname(__DIR__, 2)."/resources/lang/{$locale}/assistant.php"),
+        fn (mixed $line): bool => is_string($line) && trim($line) !== '',
+    ));
+
+    expect(array_values(array_diff($keys('es'), $keys('en'))))->toBe([])
+        ->and(array_values(array_diff($keys('en'), $keys('es'))))->toBe([]);
+});
+
 it('mounts the panel routes where the app says, throttled under its name', function () {
     Route::prefix('api')->group(fn () => AssistantRoutes::panel('panel-assistant', 'api.panel-assistant.'));
     Route::getRoutes()->refreshNameLookups();

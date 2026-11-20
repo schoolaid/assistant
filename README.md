@@ -95,7 +95,7 @@ Then, in the app:
 ### One database per workspace, or a single one
 
 - **One database per workspace** (MarketAid): leave `workspace_column` null and run the workspace
-  migration in each workspace database; the platform migration runs on `Workspace::sharedConnection()`.
+  migrations in each workspace database; the platform migration runs on `Workspace::sharedConnection()`.
 - **A single database** (SchoolAid): set `workspace_column` (for example `school_id`) before
   migrating, and `workspace_column_type` to `integer` when the ids are numeric. Conversations, turns, messages, confirmations and exports then store the workspace
   where they were created and are read only from it; outside a workspace they return no rows.
@@ -148,10 +148,19 @@ labels the records the panel opens the assistant with.
 2. Add the new translation keys (above) to the app's published files.
 3. Write a migration in the app with the columns of
    `database/migrations/2026_11_19_000000_add_audience_to_assistant_conversations.php`: an app that
-   already published the first two migrations does not publish them again.
+   already published the first two migrations does not publish them again. Copy its guards too: on
+   MySQL each column is its own ALTER outside any transaction, so each column, the index and the
+   `user_id` change check for themselves, and `down()` makes `user_id` required again before it
+   drops anything.
 4. In production, run it right after the deploy: until the `audience` column exists,
    `assistant:resume-stale-turns` and `assistant:prune` skip every workspace. The chat itself does not
    write `audience` and keeps working on the old schema.
+
+## Upgrading from 0.2.0
+
+Nothing to do in the app. 0.2.1 only changes the audience migration (each column, the index and the
+`user_id` change are guarded on their own, and `down()` restores `user_id` first) and its tests. An
+app that already ran it, or wrote its own, does not run it again.
 
 ## Not done yet
 
