@@ -2,6 +2,7 @@
 
 use SchoolAid\Assistant\Knowledge\KnowledgeSearch;
 use SchoolAid\Assistant\Knowledge\MeilisearchKnowledgeIndex;
+use SchoolAid\Assistant\Knowledge\VideoGuideCatalog;
 use SchoolAid\Assistant\Services\Audience\AudienceContracts;
 use SchoolAid\Assistant\Support\AssistantActionEventMark;
 
@@ -41,7 +42,8 @@ it('loads outside MarketAid', function (string $class) {
 it('binds what the engine provides by itself', function () {
     expect(app(KnowledgeSearch::class))->toBeInstanceOf(MeilisearchKnowledgeIndex::class)
         ->and(app(AssistantActionEventMark::class))->toBe(app(AssistantActionEventMark::class))
-        ->and(app(AudienceContracts::class))->toBe(app(AudienceContracts::class));
+        ->and(app(AudienceContracts::class))->toBe(app(AudienceContracts::class))
+        ->and(app(VideoGuideCatalog::class))->toBe(app(VideoGuideCatalog::class));
 });
 
 it('references no MarketAid class', function () {

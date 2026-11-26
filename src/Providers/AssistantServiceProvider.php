@@ -11,6 +11,7 @@ use SchoolAid\Assistant\Console\ResumeStaleTurnsCommand;
 use SchoolAid\Assistant\Http\AssistantRoutes;
 use SchoolAid\Assistant\Knowledge\KnowledgeSearch;
 use SchoolAid\Assistant\Knowledge\MeilisearchKnowledgeIndex;
+use SchoolAid\Assistant\Knowledge\VideoGuideCatalog;
 use SchoolAid\Assistant\Services\Audience\AudienceContracts;
 use SchoolAid\Assistant\Services\Tools\AssistantToolBridge;
 use SchoolAid\Assistant\Services\Tools\ToolBridge;
@@ -51,6 +52,10 @@ class AssistantServiceProvider extends ServiceProvider
     public array $singletons = [
         AssistantActionEventMark::class => AssistantActionEventMark::class,
         AudienceContracts::class => AudienceContracts::class,
+        // ⚠️ KnowledgeChunker takes it as an optional `?VideoGuideCatalog $videos = null`, and the
+        // container leaves an unbound optional class at null: without this the index read no video
+        // guides and removed every `video-*` document (tests/Engine/KnowledgeChunkerVideosTest.php)
+        VideoGuideCatalog::class => VideoGuideCatalog::class,
     ];
 
     public function register(): void
